@@ -2,6 +2,8 @@ package com.solo.tekton.mq.consumer;
 
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.tekton.client.DefaultTektonClient;
 import io.fabric8.tekton.client.TektonClient;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,16 @@ public class TektonMqTriggerApplication {
 				.withTrustCerts()
 				.build();
 		return new DefaultTektonClient(config);
+	}
+
+	@Bean
+	public KubernetesClient kubernetesClient() {
+		Config config = new ConfigBuilder()
+				.withMasterUrl(k8sUrl)
+				.withOauthToken(k8sToken)
+				.withTrustCerts()
+				.build();
+		return new KubernetesClientBuilder().withConfig(config).build();
 	}
 
 	@Bean

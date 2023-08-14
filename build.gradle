@@ -28,6 +28,7 @@ dependencies {
 	implementation 'org.bouncycastle:bcpkix-jdk15on:1.69'
 	implementation 'org.bouncycastle:bcprov-jdk15on:1.69'
 	implementation 'org.bouncycastle:bcprov-ext-jdk15on:1.69'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 	annotationProcessor 'org.projectlombok:lombok'

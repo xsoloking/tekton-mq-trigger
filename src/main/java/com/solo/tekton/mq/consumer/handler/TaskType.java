@@ -14,5 +14,5 @@ public enum TaskType {
     TaskMaven("JJB_Task_Maven", com.solo.tekton.mq.consumer.handler.TaskMaven::new);
 
     private final String name;
-    private final Function<RuntimeInfo, Task> constructor;
+    private final Function<RuntimeInfo, BaseTask> constructor;
 }

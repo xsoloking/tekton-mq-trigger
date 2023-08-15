@@ -30,17 +30,6 @@ public class TektonMqTriggerApplication {
 
 	static final String k8sUrl = "https://131.186.20.125:6443";
 
-
-	@Bean
-	public TektonClient tektonClient() {
-		Config config = new ConfigBuilder()
-				.withMasterUrl(k8sUrl)
-				.withOauthToken(k8sToken)
-				.withTrustCerts()
-				.build();
-		return new DefaultTektonClient(config);
-	}
-
 	@Bean
 	public KubernetesClient kubernetesClient() {
 		Config config = new ConfigBuilder()

@@ -22,9 +22,6 @@ import java.util.List;
 public class BuildListener {
 
     @Autowired
-    TektonClient tektonClient;
-
-    @Autowired
     KubernetesClient kubernetesClient;
 
     @RabbitListener(queues = "tasks-triggered")
@@ -33,15 +30,13 @@ public class BuildListener {
         ObjectMapper mapper = new ObjectMapper();
         RuntimeInfo runtimeInfo = mapper.readValue(body, RuntimeInfo.class);
         BaseTask task = TaskFactory.createTask(runtimeInfo);
-        if(task.prepareResources(kubernetesClient)) {
-            if(task.createPipelineRun(tektonClient)) {
-                log.info("TODO");
-            } else {
-                log.error("TOD");
-            }
+
+        if(task.createPipelineRun(kubernetesClient)) {
+            log.info("TODO");
         } else {
             log.error("TOD");
         }
+
     }
 
 }

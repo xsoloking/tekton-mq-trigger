@@ -26,7 +26,8 @@ public class TaskGit implements BaseTask {
     private String basicAuthSecretName;
 
     @Override
-    public boolean createPipelineRun(TektonClient tektonClient) {
+    public boolean createPipelineRun(KubernetesClient k8sClient) {
+        TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         try {
             PipelineRun pipelineRun = new PipelineRunBuilder()
                     .withNewMetadata()
@@ -69,17 +70,12 @@ public class TaskGit implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
-            tektonClient.v1().pipelineRuns().createOrReplace(pipelineRun);
+            Object results = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
+            log.info("Create pipelineRun with info {} was successful with results: {}", runtimeInfo, results);
         } catch (ParseException e) {
             log.error("Create pipelineRun with info {} was failed with an exception:", runtimeInfo, e);
             return false;
         }
-        return true;
-    }
-
-    @Override
-    public boolean prepareResources(KubernetesClient kubernetesClient) {
-        System.out.println("Git setup");
         return true;
     }
 }

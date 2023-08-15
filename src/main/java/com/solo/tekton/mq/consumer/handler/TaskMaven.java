@@ -10,21 +10,24 @@ import io.fabric8.tekton.pipeline.v1.PipelineRunBuilder;
 import io.fabric8.tekton.pipeline.v1.WorkspaceBindingBuilder;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.text.ParseException;
 import java.util.List;
 
 @RequiredArgsConstructor
+@Slf4j
 public class TaskMaven implements BaseTask {
 
     @NonNull
     private RuntimeInfo runtimeInfo;
 
     @Override
-    public boolean createPipelineRun(TektonClient tektonClient) {
-        PipelineRun pipelineRun = null;
+    public boolean createPipelineRun(KubernetesClient k8sClient) {
+        TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
+
         try {
-            pipelineRun = new PipelineRunBuilder()
+            PipelineRun pipelineRun = new PipelineRunBuilder()
                     .withNewMetadata()
                     .withGenerateName("task-git-")
                     .withNamespace("default")
@@ -65,15 +68,11 @@ public class TaskMaven implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
+            Object results = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
+            log.info("Create pipelineRun with info {} was successful with results: {}", runtimeInfo, results);
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }
-        return true;
-    }
-
-    @Override
-    public boolean prepareResources(KubernetesClient kubernetesClient) {
-        System.out.println("Git setup");
         return true;
     }
 }

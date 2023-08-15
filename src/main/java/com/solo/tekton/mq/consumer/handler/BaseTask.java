@@ -7,6 +7,5 @@ import io.fabric8.tekton.pipeline.v1.PipelineRun;
 import java.util.List;
 
 public interface BaseTask {
-    boolean createPipelineRun(TektonClient tektonClient);
-    boolean prepareResources(KubernetesClient kubernetesClient);
+    boolean createPipelineRun(KubernetesClient k8sClient);
 }

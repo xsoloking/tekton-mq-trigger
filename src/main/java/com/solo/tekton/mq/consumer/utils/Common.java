@@ -20,7 +20,7 @@ public class Common {
         String host = uri.getHost();
         int port = uri.getPort();
         if (port == -1) {
-            port = 80;
+            return String.format("%s://%s:%d", uri.getScheme(), host);
         }
         return String.format("%s://%s:%d", uri.getScheme(), host, port);
     }

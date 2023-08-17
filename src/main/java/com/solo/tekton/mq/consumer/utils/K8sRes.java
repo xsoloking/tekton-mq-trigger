@@ -70,8 +70,8 @@ public class K8sRes {
                 .withSecrets()
                 .addToSecrets(new ObjectReferenceBuilder()
                         .withKind("Secret")
-                        .withNamespace(ns)
-                        .withName(secretName)
+                        .withName("git-basic-auth-01")
+                        .withApiVersion("v1")
                         .build())
                 .build();
         return k8sClient.serviceAccounts().resource(serviceAccount).serverSideApply();

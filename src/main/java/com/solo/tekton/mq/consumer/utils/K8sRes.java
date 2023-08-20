@@ -13,11 +13,11 @@ public class K8sRes {
      *
      * Params: k8sClient - a kubernetes client used to create resource
      *         secretName - secret name
-     *         gitUrl - git repo url used to get git server url
+     *         repoUrl - git repo url used to get git server url
      *         token - gitlab/github server's personal token used to access git server
      * Returns: Object
      **/
-    public static Object createGitSecret(KubernetesClient k8sClient, String ns, String name, String gitUrl, String token) {
+    public static Object createGitSecret(KubernetesClient k8sClient, String ns, String name, String repoUrl, String token) {
         /*
         Here is the example yaml file for git basic auth secret：
         apiVersion: v1
@@ -38,7 +38,7 @@ public class K8sRes {
                 .withNewMetadata()
                 .withNamespace(ns)
                 .withName(name)
-                .addToAnnotations("tekton.dev/git-0", Common.extractGitServerUrl(gitUrl))
+                .addToAnnotations("tekton.dev/git-0", Common.extractGitServerUrl(repoUrl))
                 .endMetadata()
                 .withType("kubernetes.io/basic-auth")
                 .withStringData(new HashMap<String, String>() {{

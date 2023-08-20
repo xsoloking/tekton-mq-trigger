@@ -10,8 +10,8 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public enum TaskType {
 
-    TaskGit("JJB_Task_Git", com.solo.tekton.mq.consumer.handler.TaskGit::new),
-    TaskMaven("JJB_Task_Maven", com.solo.tekton.mq.consumer.handler.TaskMaven::new);
+    JJB_Task_Git("JJB_Task_Git", com.solo.tekton.mq.consumer.handler.TaskGit::new),
+    JJB_Task_Maven("JJB_Task_Maven", com.solo.tekton.mq.consumer.handler.TaskMaven::new);
 
     private final String name;
     private final Function<RuntimeInfo, BaseTask> constructor;

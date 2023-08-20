@@ -25,8 +25,8 @@ public class TaskGit implements BaseTask {
         // create a 5 chars random string for secret name which starts with "auto-git-auth-"
         String token = params.get("CREDENTIALS_ID");
         String postfix = token.substring(token.length() / 3, token.length() / 2);
-        String secretName = "git-auth-" + postfix;
-        String serviceAccountName = "sa-with-secret-" + postfix;
+        String secretName = ("git-auth-" + postfix).toLowerCase();
+        String serviceAccountName = ("sa-with-secret-" + postfix).toLowerCase();
 
         Secret secret = new SecretBuilder()
                 .withApiVersion("v1")
@@ -84,19 +84,22 @@ public class TaskGit implements BaseTask {
                     .withName("task-git")
                     .endPipelineRef()
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
-                            .withPipelineTaskName("core-task")
+                            .withPipelineTaskName("main")
                             .withServiceAccountName(prepareResource(k8sClient, params))
                             .withNewPodTemplate()
-                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1])
+                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
+                            .endPodTemplate()
+                            .build())
+                    .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
+                            .withPipelineTaskName("post")
+                            .withServiceAccountName(prepareResource(k8sClient, params))
+                            .withNewPodTemplate()
+                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()
                             .build())
                     .addToWorkspaces(new WorkspaceBindingBuilder()
                             .withName("data")
                             .withNewPersistentVolumeClaim(params.get("TASK_PVC_NAME"), false)
-                            .build())
-                    .addToWorkspaces(new WorkspaceBindingBuilder()
-                            .withName("basic-auth")
-                            .withSecret(new SecretVolumeSourceBuilder().withSecretName("my-basic-auth-secret").build())
                             .build())
                     .addToParams(new ParamBuilder()
                             .withName("TASK_INSTANCE_ID")
@@ -109,6 +112,10 @@ public class TaskGit implements BaseTask {
                     .addToParams(new ParamBuilder()
                             .withName("REPO_REVISION")
                             .withNewValue(params.get("GIT_REVISION"))
+                            .build())
+                    .addToParams(new ParamBuilder()
+                            .withName("WORKING_PATH")
+                            .withNewValue(Common.generateWorkingPath(params.get("GIT_URL"), params.get("GIT_REVISION")))
                             .build())
                     .withNewTimeouts()
                     .withPipeline(Duration.parse("40m"))

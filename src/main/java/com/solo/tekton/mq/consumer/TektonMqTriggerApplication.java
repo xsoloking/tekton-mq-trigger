@@ -4,17 +4,9 @@ import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
-import io.fabric8.tekton.client.DefaultTektonClient;
-import io.fabric8.tekton.client.TektonClient;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -55,20 +47,20 @@ public class TektonMqTriggerApplication {
 		return new RabbitTemplate(connectionFactory());
 	}
 
-	@Bean
-	Queue queue() {
-		return new Queue(queueName, false);
-	}
-
-	@Bean
-	TopicExchange exchange() {
-		return new TopicExchange(topicExchangeName);
-	}
-
-	@Bean
-	Binding binding(Queue queue, TopicExchange exchange) {
-		return BindingBuilder.bind(queue).to(exchange).with("trigger");
-	}
+//	@Bean
+//	Queue queue() {
+//		return new Queue(queueName, true, false, true);
+//	}
+//
+//	@Bean
+//	TopicExchange exchange() {
+//		return new TopicExchange(topicExchangeName);
+//	}
+//
+//	@Bean
+//	Binding binding(Queue queue, TopicExchange exchange) {
+//		return BindingBuilder.bind(queue).to(exchange).with("trigger");
+//	}
 
 	public static void main(String[] args) {
 		SpringApplication.run(TektonMqTriggerApplication.class, args);

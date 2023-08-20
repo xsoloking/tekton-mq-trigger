@@ -1,19 +1,16 @@
 package com.solo.tekton.mq.consumer.handler;
 
+import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.kubernetes.api.model.Duration;
-import io.fabric8.kubernetes.api.model.SecretVolumeSourceBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
-import io.fabric8.tekton.pipeline.v1.ParamBuilder;
-import io.fabric8.tekton.pipeline.v1.PipelineRun;
-import io.fabric8.tekton.pipeline.v1.PipelineRunBuilder;
-import io.fabric8.tekton.pipeline.v1.WorkspaceBindingBuilder;
+import io.fabric8.tekton.pipeline.v1.*;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.text.ParseException;
-import java.util.List;
+import java.util.Map;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -25,53 +22,72 @@ public class TaskMaven implements BaseTask {
     @Override
     public boolean createPipelineRun(KubernetesClient k8sClient) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
-
+        Map<String, String> params = Common.getParams(runtimeInfo);
+        String nodeSelector = params.get("TASK_NODE_SELECTOR");
         try {
             PipelineRun pipelineRun = new PipelineRunBuilder()
                     .withNewMetadata()
-                    .withGenerateName("task-git-")
+                    .withGenerateName("task-maven-")
                     .withNamespace("default")
-                    .addToAnnotations("devops.flow/tenantId", "1234")
-                    .addToAnnotations("devops.flow/systemId", "1234")
-                    .addToAnnotations("devops.flow/flowId", "1234")
-                    .addToAnnotations("devops.flow/flowInstanceId", "1234")
-                    .addToAnnotations("devops.flow/taskInstanceId", "1234")
+                    .addToAnnotations("devops.flow/tenantId", params.get("tenantCode"))
+                    .addToAnnotations("devops.flow/systemId", params.get("systemId"))
+                    .addToAnnotations("devops.flow/flowId", params.get("flowId"))
+                    .addToAnnotations("devops.flow/flowInstanceId", params.get("flowInstanceId"))
+                    .addToAnnotations("devops.flow/taskInstanceId", params.get("taskInstanceId"))
                     .endMetadata()
                     .withNewSpec()
                     .withNewPipelineRef()
-                    .withName("task-git")
+                    .withName("task-maven")
                     .endPipelineRef()
-                    .addToWorkspaces(new WorkspaceBindingBuilder()
-                            .withName("data")
-                            .withNewPersistentVolumeClaim("test-01", false)
+                    .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
+                            .withPipelineTaskName("main")
+                            .withNewPodTemplate()
+                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
+                            .endPodTemplate()
+                            .build())
+                    .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
+                            .withPipelineTaskName("post")
+                            .withServiceAccountName("git-basic-auth-4-post-task")
+                            .withNewPodTemplate()
+                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
+                            .endPodTemplate()
                             .build())
                     .addToWorkspaces(new WorkspaceBindingBuilder()
-                            .withName("basic-auth")
-                            .withSecret(new SecretVolumeSourceBuilder().withSecretName("my-basic-auth-secret").build())
+                            .withName("data")
+                            .withNewPersistentVolumeClaim(params.get("TASK_PVC_NAME"), false)
+                            .build())
+                    .addToWorkspaces(new WorkspaceBindingBuilder()
+                            .withName("cache")
+                            .withNewPersistentVolumeClaim(params.get("TASK_CACHE_PVC_NAME"), false)
                             .build())
                     .addToParams(new ParamBuilder()
                             .withName("TASK_INSTANCE_ID")
-                            .withNewValue("123456")
+                            .withNewValue(params.get("taskInstanceId"))
                             .build())
                     .addToParams(new ParamBuilder()
-                            .withName("REPO_URL")
-                            .withNewValue("https://github.com/xsoloking/jenkins-shared-libraries.git")
+                            .withName("TASK_IMAGE")
+                            .withNewValue(params.get("TASK_IMAGE"))
                             .build())
                     .addToParams(new ParamBuilder()
-                            .withName("REPO_REVISION")
-                            .withNewValue("dev")
+                            .withName("TASK_SCRIPT")
+                            .withNewValue(params.get("SCRIPT"))
+                            .build())
+                    .addToParams(new ParamBuilder()
+                            .withName("WORKING_PATH")
+                            .withNewValue(params.get("SOURCE"))
                             .build())
                     .withNewTimeouts()
                     .withPipeline(Duration.parse("40m"))
-                    .withTasks(Duration.parse("30m"))
-                    .withFinally(Duration.parse("5m"))
+                    .withTasks(Duration.parse(params.get("TASK_TIMEOUT") + "m"))
+                    .withFinally(Duration.parse("2m"))
                     .endTimeouts()
                     .endSpec()
                     .build();
             Object results = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
             log.info("Create pipelineRun with info {} was successful with results: {}", runtimeInfo, results);
         } catch (ParseException e) {
-            throw new RuntimeException(e);
+            log.error("Create pipelineRun with info {} was failed with an exception:", runtimeInfo, e);
+            return false;
         }
         return true;
     }

@@ -1,7 +1,6 @@
 package com.solo.tekton.mq.consumer.handler;
 
 import lombok.Data;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;

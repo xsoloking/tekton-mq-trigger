@@ -37,7 +37,7 @@ public class TaskGit implements BaseTask {
                 .addToAnnotations("tekton.dev/git-0", Common.extractGitServerUrl(params.get("GIT_URL")))
                 .endMetadata()
                 .withType("kubernetes.io/basic-auth")
-                .withStringData(new HashMap<String, String>() {{
+                .withStringData(new HashMap<>() {{
                     put("username", "git");
                     put("password", new String(Base64.getDecoder().decode(token)));
                 }})

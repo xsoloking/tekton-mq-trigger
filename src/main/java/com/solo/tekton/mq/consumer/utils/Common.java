@@ -10,7 +10,7 @@ public class Common {
 
     public static Map<String, String> getParams(RuntimeInfo runtimeInfo) {
         Map<String, String> params = new HashMap<>();
-        runtimeInfo.getParameters().stream()
+        runtimeInfo.getParameters()
                 .forEach(item -> params.put(item.get("name"), item.get("value")));
         return params;
     }

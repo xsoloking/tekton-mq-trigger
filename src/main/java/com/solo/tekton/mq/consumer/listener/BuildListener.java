@@ -32,7 +32,6 @@ public class BuildListener {
         } else {
             log.error("TOD");
         }
-
     }
 
 }

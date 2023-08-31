@@ -12,6 +12,6 @@ public class RuntimeInfo {
 
     private String token;
 
-    private List<Map<String, String>> parameters;
+    private List<Map<String, String>> parameter;
 
 }

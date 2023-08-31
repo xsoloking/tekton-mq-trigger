@@ -18,10 +18,11 @@ public class LoggingListener {
 
     @Autowired
     KubernetesClient kubernetesClient;
+
     @RabbitListener(queues = "tasks-logging")
     public void receiveMessage(String taskInstanceId) throws IOException, InterruptedException {
         log.info("Received message: " + taskInstanceId);
-        final CountDownLatch watchLatch = new CountDownLatch(1);
+        CountDownLatch watchLatch = new CountDownLatch(1);
         Watcher<Pod> watcher = new Watcher<Pod>() {
             @Override
             public void eventReceived(Action action, Pod aPod) {
@@ -39,6 +40,6 @@ public class LoggingListener {
         };
         kubernetesClient.pods().inNamespace("default")
                 .withLabel("devops.flow/taskInstanceId", taskInstanceId)
-                .withLabel("tekton.dev/pipelineTask", "main").watch(watcher);
+                .withLabel("tekton.dev/pipelineTask", "main").;
     }
 }

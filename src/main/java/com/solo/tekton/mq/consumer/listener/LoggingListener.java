@@ -5,6 +5,10 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.ExchangeTypes;
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -19,7 +23,11 @@ public class LoggingListener {
     @Autowired
     KubernetesClient kubernetesClient;
 
-    @RabbitListener(queues = "tasks-logging")
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(value = "${flow.mq.queue.logging}", durable = "true"),
+            exchange = @Exchange(value = "${flow.mq.exchange}", type = ExchangeTypes.DIRECT),
+            key = "${flow.mq.route.key.logging}"
+    ))
     public void receiveMessage(String taskInstanceId) throws IOException, InterruptedException {
         log.info("Received message: " + taskInstanceId);
         CountDownLatch watchLatch = new CountDownLatch(1);

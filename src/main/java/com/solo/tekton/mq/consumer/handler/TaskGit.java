@@ -64,7 +64,7 @@ public class TaskGit implements BaseTask {
     }
 
     @Override
-    public boolean createPipelineRun(KubernetesClient k8sClient) {
+    public boolean createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -72,7 +72,7 @@ public class TaskGit implements BaseTask {
             PipelineRun pipelineRun = new PipelineRunBuilder()
                     .withNewMetadata()
                     .withGenerateName("task-git-")
-                    .withNamespace("default")
+                    .withNamespace(namespace)
                     .addToLabels("devops.flow/tenantId", params.get("tenantCode"))
                     .addToLabels("devops.flow/systemId", params.get("systemId"))
                     .addToLabels("devops.flow/flowId", params.get("flowId"))

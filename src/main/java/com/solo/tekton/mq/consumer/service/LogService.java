@@ -35,7 +35,7 @@ public class LogService {
     private final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
     @Async
-    public void redirectLogs(TaskLog taskLog, long timeout) {
+    public void redirectLogs(TaskLog taskLog) {
         log.info("Redirecting logs for taskInstance \"{}\"",  taskLog.getTaskInstanceId());
         try {
             Map<String, String> labelFilter = Map.of(
@@ -71,7 +71,7 @@ public class LogService {
                 }
             });
             podRes.get().waitUntilCondition(  r -> r.getStatus().getPhase().equals("Succeeded")
-                    || r.getStatus().getPhase().equals("Terminated"), timeout, TimeUnit.MINUTES);
+                    || r.getStatus().getPhase().equals("Terminated"), taskLog.getTimeout(), TimeUnit.MINUTES);
         } catch (Exception e) {
             log.error("Redirecting logs for taskInstance \"{}\" was failed due to {}",  taskLog.getTaskInstanceId(), e);
         }

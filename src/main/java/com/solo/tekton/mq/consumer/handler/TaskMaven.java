@@ -20,7 +20,7 @@ public class TaskMaven implements BaseTask {
     private RuntimeInfo runtimeInfo;
 
     @Override
-    public boolean createPipelineRun(KubernetesClient k8sClient, String namespace) {
+    public void createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -47,6 +47,7 @@ public class TaskMaven implements BaseTask {
                             .build())
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("post")
+                            // TODO load the value of service account from configuration
                             .withServiceAccountName("git-basic-auth-4-post-task")
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
@@ -83,12 +84,9 @@ public class TaskMaven implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
-            Object results = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
-            log.info("Create pipelineRun with info {} was successful with results: {}", runtimeInfo, results);
+            tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
         } catch (ParseException e) {
-            log.error("Create pipelineRun with info {} was failed with an exception:", runtimeInfo, e);
-            return false;
+            throw new RuntimeException(e);
         }
-        return true;
     }
 }

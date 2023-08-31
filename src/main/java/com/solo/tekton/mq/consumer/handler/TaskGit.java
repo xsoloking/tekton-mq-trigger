@@ -64,7 +64,7 @@ public class TaskGit implements BaseTask {
     }
 
     @Override
-    public boolean createPipelineRun(KubernetesClient k8sClient, String namespace) {
+    public void createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -124,12 +124,9 @@ public class TaskGit implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
-            Object results = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
-            log.info("Create pipelineRun with info {} was successful with results: {}", runtimeInfo, results);
+            tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
         } catch (ParseException e) {
-            log.error("Create pipelineRun with info {} was failed with an exception:", runtimeInfo, e);
-            return false;
+            throw new RuntimeException(e);
         }
-        return true;
     }
 }

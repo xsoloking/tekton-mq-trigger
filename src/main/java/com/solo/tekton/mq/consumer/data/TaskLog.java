@@ -15,4 +15,5 @@ public class TaskLog {
     public String logContent;
     public boolean htmlLog;
     public int logType;
+    public long timeout;
 }

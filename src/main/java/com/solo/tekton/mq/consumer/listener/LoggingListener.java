@@ -1,9 +1,8 @@
 package com.solo.tekton.mq.consumer.listener;
 
-import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.WatcherException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.solo.tekton.mq.consumer.data.TaskLog;
+import com.solo.tekton.mq.consumer.service.LogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.rabbit.annotation.Exchange;
@@ -14,40 +13,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
 
 @Component
 @Slf4j
 public class LoggingListener {
 
     @Autowired
-    KubernetesClient kubernetesClient;
+    LogService logService;
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "${flow.mq.queue.logging}", durable = "true"),
             exchange = @Exchange(value = "${flow.mq.exchange}", type = ExchangeTypes.DIRECT),
-            key = "${flow.mq.route.key.logging}"
+            key = "${flow.mq.routing.key.logging}"
     ))
-    public void receiveMessage(String taskInstanceId) throws IOException, InterruptedException {
-        log.info("Received message: " + taskInstanceId);
-        CountDownLatch watchLatch = new CountDownLatch(1);
-        Watcher<Pod> watcher = new Watcher<Pod>() {
-            @Override
-            public void eventReceived(Action action, Pod aPod) {
-                log.info(aPod.getMetadata().getName(), aPod.getStatus().getPhase());
-                if (aPod.getStatus().getPhase().equals("Succeeded")) {
-                    log.info("Logs -> ", kubernetesClient.pods().inNamespace("default").withName(aPod.getMetadata().getName()).inContainer("step-executor").getLog());
-                    watchLatch.countDown();
-                }
-            }
-
-            @Override
-            public void onClose(WatcherException e) {
-                // Ignore
-            }
-        };
-        kubernetesClient.pods().inNamespace("default")
-                .withLabel("devops.flow/taskInstanceId", taskInstanceId)
-                .withLabel("tekton.dev/pipelineTask", "main").;
+    public void receiveMessage(byte[] body) throws IOException {
+        log.info("Received message: " + new String(body));
+        ObjectMapper mapper = new ObjectMapper();
+        TaskLog taskLog = mapper.readValue(body, TaskLog.class);
+        logService.redirectLogs(taskLog);
     }
 }

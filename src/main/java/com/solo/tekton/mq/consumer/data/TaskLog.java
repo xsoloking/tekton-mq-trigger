@@ -3,8 +3,10 @@ package com.solo.tekton.mq.consumer.data;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 
+import java.io.Serializable;
+
 @Data
-public class TaskLog {
+public class TaskLog implements Serializable {
 
     @Id
     public String _id;

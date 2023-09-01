@@ -36,7 +36,7 @@ public class LogService {
 
     @Async
     public void redirectLogs(TaskLog taskLog) {
-        log.info("Redirecting logs for taskInstance \"{}\"",  taskLog.getTaskInstanceId());
+        log.info("Redirecting logs for task \"{}\"",  taskLog.getTaskInstanceId());
         try {
             Map<String, String> labelFilter = Map.of(
                     "devops.flow/taskInstanceId",
@@ -47,7 +47,7 @@ public class LogService {
                     .withLabels(labelFilter)
                     .resources()
                     .findFirst();
-            if (! podRes.isPresent()) {
+            if (podRes.isEmpty()) {
                 log.info("no pod found for taskInstance: {}, log redirection was cancelled", taskLog.getTaskInstanceId());
                 return;
             }
@@ -64,7 +64,6 @@ public class LogService {
                 @Override
                 public void write(byte[] b, int off, int len) throws IOException {
                     for (String line: new String(b, off, len).trim().split("\n")) {
-                        log.info("Start to redirect logs for task \"{}\"", taskLog.getTaskInstanceId());
                         taskLog.setLogContent(line);
                         insertLogToMongo(taskLog);
                     }
@@ -73,22 +72,31 @@ public class LogService {
             podRes.get().waitUntilCondition(  r -> r.getStatus().getPhase().equals("Succeeded")
                     || r.getStatus().getPhase().equals("Terminated"), taskLog.getTimeout(), TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.error("Redirecting logs for taskInstance \"{}\" was failed due to {}",  taskLog.getTaskInstanceId(), e);
+            log.error("Redirecting logs for task \"{}\" was failed due to {}", taskLog.getTaskInstanceId(), e.getMessage());
         }
     }
 
+    @Async
     public void insertLogToMongo(TaskLog taskLog) {
+        TaskLog newTaskLog = new TaskLog();
+        newTaskLog.setTaskInstanceId(taskLog.getTaskInstanceId());
+        newTaskLog.setExecuteBatchId(taskLog.getExecuteBatchId());
+        newTaskLog.setFlowInstanceId(taskLog.getFlowInstanceId());
+        newTaskLog.setNodeInstanceId(taskLog.getNodeInstanceId());
         String timestamp = sdf.format(new Timestamp(System.currentTimeMillis()));
         String msg = timestamp + " [INFO] " + taskLog.getLogContent();
-        taskLog.setLogType(2);
+        newTaskLog.setLogType(2);
         if(taskLog.getLogContent().toLowerCase().contains("error") || taskLog.getLogContent().toLowerCase().contains("exception")) {
-            taskLog.setLogType(1);
+            newTaskLog.setLogType(1);
             msg = timestamp + " [ERROR] " + taskLog.getLogContent();
         } else if (taskLog.getLogContent().toLowerCase().contains("warning")) {
-            taskLog.setLogType(3);
+            newTaskLog.setLogType(3);
             msg = timestamp + " [WARNING] " + taskLog.getLogContent();
         }
-        taskLog.setLogContent(msg);
-        mongoTemplate.insert(taskLog, String.valueOf(taskLog.getTaskInstanceId()));
+        if (taskLog.getLogContent().toLowerCase().contains("http://") || taskLog.getLogContent().toLowerCase().contains("https://")) {
+            newTaskLog.setHtmlLog(true);
+        }
+        newTaskLog.setLogContent(msg);
+        mongoTemplate.insert(newTaskLog, String.valueOf(taskLog.getTaskInstanceId()));
     }
 }

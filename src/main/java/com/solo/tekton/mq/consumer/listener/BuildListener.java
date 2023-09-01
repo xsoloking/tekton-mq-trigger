@@ -8,9 +8,12 @@ import com.solo.tekton.mq.consumer.handler.TaskFactory;
 import com.solo.tekton.mq.consumer.service.LogService;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -54,9 +57,19 @@ public class BuildListener {
         try {
             task.createPipelineRun(kubernetesClient, namespace);
             //TODO send taskLog as message to rabbitmq, and set the content type to application/json
-            MessageProperties properties = new MessageProperties();
-            properties.setContentType("application/json");
-            rabbitTemplate.convertAndSend(exchange, routingKey, taskLog);
+//            MessageProperties properties = new MessageProperties();
+//            properties.setContentType("application/json");
+            rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+//            String msg = new ObjectMapper().writeValueAsString(taskLog);
+            MessagePostProcessor messagePostProcessor = new MessagePostProcessor() {
+                @Override
+                public Message postProcessMessage(Message message) throws AmqpException {
+                    message.getMessageProperties().setContentType("application/json");
+                    message.getMessageProperties().setContentEncoding("UTF-8");
+                    return message;
+                }
+            };
+            rabbitTemplate.convertAndSend(exchange, routingKey, taskLog, messagePostProcessor);
             log.info("Create pipelineRun for task \"{}:{}\" was successful", runtimeInfo.getProject(), taskInstanceId);
             taskLog.setLogContent("Start to run task \"" + runtimeInfo.getProject() + " \"");
             logService.insertLogToMongo(taskLog);

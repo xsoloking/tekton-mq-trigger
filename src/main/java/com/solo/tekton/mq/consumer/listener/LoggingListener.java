@@ -1,5 +1,6 @@
 package com.solo.tekton.mq.consumer.listener;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solo.tekton.mq.consumer.data.TaskLog;
 import com.solo.tekton.mq.consumer.service.LogService;
@@ -11,8 +12,6 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 @Component
 @Slf4j
@@ -26,10 +25,16 @@ public class LoggingListener {
             exchange = @Exchange(value = "${flow.mq.exchange}", type = ExchangeTypes.DIRECT),
             key = "${flow.mq.routing.key.logging}"
     ))
-    public void receiveMessage(byte[] body) throws IOException {
-        log.info("Received message: " + new String(body));
-        ObjectMapper mapper = new ObjectMapper();
-        TaskLog taskLog = mapper.readValue(body, TaskLog.class);
+    public void onMessage(String message) throws JsonProcessingException {
+        log.info("Received message: " + message);
+        TaskLog taskLog = new ObjectMapper().readValue(message, TaskLog.class);
         logService.redirectLogs(taskLog);
     }
+//    public void receiveMessage(byte[] body) throws IOException {
+//        String msg = new String(body);
+//        log.info("Received message: " + msg);
+//        ObjectMapper mapper = new ObjectMapper();
+//        TaskLog taskLog = mapper.readValue(msg, TaskLog.class);
+//        logService.redirectLogs(taskLog);
+//    }
 }

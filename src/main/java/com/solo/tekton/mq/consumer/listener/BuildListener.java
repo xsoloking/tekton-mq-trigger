@@ -16,6 +16,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -49,18 +50,31 @@ public class BuildListener {
     @RabbitListener(queues = "${flow.mq.queue.triggered}")
     public void receiveMessage(byte[] body) throws IOException {
         log.info("Received message: " + new String(body));
+        taskHandling(body);
+    }
+
+    @Async
+    private void taskHandling(byte[] body) {
         ObjectMapper mapper = new ObjectMapper();
-        RuntimeInfo runtimeInfo = mapper.readValue(body, RuntimeInfo.class);
+        RuntimeInfo runtimeInfo = null;
+        try {
+            runtimeInfo = mapper.readValue(body, RuntimeInfo.class);
+        } catch (IOException e) {
+            log.error("Task wasn't handled, due to failed to parse message: " + new String(body));
+            return;
+        }
+        // Should not happen
+        if (runtimeInfo == null) {
+            log.error("Task wasn't handled, due to failed to parse message: " + new String(body));
+            return;
+        }
         BaseTask task = TaskFactory.createTask(runtimeInfo);
         TaskLog taskLog = this.generateTaskLog(runtimeInfo);
         Long taskInstanceId = taskLog.getTaskInstanceId();
         try {
+            // Create pipelineRun
             task.createPipelineRun(kubernetesClient, namespace);
-            //TODO send taskLog as message to rabbitmq, and set the content type to application/json
-//            MessageProperties properties = new MessageProperties();
-//            properties.setContentType("application/json");
             rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
-//            String msg = new ObjectMapper().writeValueAsString(taskLog);
             MessagePostProcessor messagePostProcessor = new MessagePostProcessor() {
                 @Override
                 public Message postProcessMessage(Message message) throws AmqpException {
@@ -69,6 +83,7 @@ public class BuildListener {
                     return message;
                 }
             };
+            // Send message for redirect logs
             rabbitTemplate.convertAndSend(exchange, routingKey, taskLog, messagePostProcessor);
             log.info("Create pipelineRun for task \"{}:{}\" was successful", runtimeInfo.getProject(), taskInstanceId);
             taskLog.setLogContent("Start to run task \"" + runtimeInfo.getProject() + " \"");

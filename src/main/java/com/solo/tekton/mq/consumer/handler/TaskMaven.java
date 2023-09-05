@@ -20,7 +20,7 @@ public class TaskMaven implements BaseTask {
     private RuntimeInfo runtimeInfo;
 
     @Override
-    public void createPipelineRun(KubernetesClient k8sClient, String namespace) {
+    public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -84,7 +84,7 @@ public class TaskMaven implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
-            tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
+            return tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }

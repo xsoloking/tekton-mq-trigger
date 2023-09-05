@@ -3,9 +3,6 @@ package com.solo.tekton.mq.consumer.handler;
 import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.kubernetes.api.model.*;
 import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.Watch;
-import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.WatcherException;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.*;
 import lombok.NonNull;
@@ -16,8 +13,6 @@ import java.text.ParseException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -69,7 +64,7 @@ public class TaskGit implements BaseTask {
     }
 
     @Override
-    public void createPipelineRun(KubernetesClient k8sClient, String namespace) {
+    public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -129,30 +124,7 @@ public class TaskGit implements BaseTask {
                     .endTimeouts()
                     .endSpec()
                     .build();
-            PipelineRun result = tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
-            final CountDownLatch watchLatch = new CountDownLatch(1);
-            try (Watch ignored = tektonClient.v1().pipelineRuns().withName(result.getMetadata().getName()).watch(
-                    new Watcher<PipelineRun>() {
-                        @Override
-                        public void eventReceived(Action action, PipelineRun resource) {
-                        /* TODO
-                              Condition(lastTransitionTime=2023-09-04T15:03:16Z, message=Error retrieving pipeline for pipelinerun tekton-pipelines/task-git-ndkkr: error when listing pipelines for pipelineRun task-git-ndkkr: pipelines.tekton.dev "task-git" not found, reason=CouldntGetPipeline, severity=null, status=False, type=Succeeded, additionalProperties={})
-
-      Condition(lastTransitionTime=2023-09-04T15:06:28Z, message=Tasks Completed: 0 (Failed: 0, Cancelled 0), Incomplete: 2, Skipped: 0, reason=Running, severity=null, status=Unknown, type=Succeeded, additionalProperties={})
-                         */
-
-                        }
-
-                        @Override
-                        public void onClose(WatcherException cause) {
-
-                        }
-                    })) {
-                watchLatch.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException interruptedException) {
-                Thread.currentThread().interrupt();
-                log.error("Could not watch PipelineRun", interruptedException);
-            }
+            return tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }

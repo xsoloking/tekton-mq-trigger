@@ -6,21 +6,29 @@ import com.solo.tekton.mq.consumer.handler.BaseTask;
 import com.solo.tekton.mq.consumer.handler.RuntimeInfo;
 import com.solo.tekton.mq.consumer.handler.TaskFactory;
 import com.solo.tekton.mq.consumer.service.LogService;
+import io.fabric8.knative.internal.pkg.apis.Condition;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
+import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.WatcherException;
+import io.fabric8.tekton.client.TektonClient;
+import io.fabric8.tekton.pipeline.v1.PipelineRun;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.configurationprocessor.json.JSONException;
+import org.springframework.boot.configurationprocessor.json.JSONObject;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static com.solo.tekton.mq.consumer.utils.Common.getParams;
 
@@ -39,10 +47,16 @@ public class BuildListener {
     String exchange;
 
     @Value("${flow.mq.routing.key.logging}")
-    String routingKey;
+    String loggingRoutingKey;
+
+    @Value("${flow.mq.routing.key.end}")
+    String endRoutingKey;
 
     @Autowired
     RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    MessagePostProcessor messagePostProcessor;
 
     @Autowired
     LogService logService;
@@ -69,28 +83,15 @@ public class BuildListener {
             return;
         }
         BaseTask task = TaskFactory.createTask(runtimeInfo);
-        TaskLog taskLog = this.generateTaskLog(runtimeInfo);
-        Long taskInstanceId = taskLog.getTaskInstanceId();
         try {
             // Create pipelineRun
-            task.createPipelineRun(kubernetesClient, namespace);
-            rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
-            MessagePostProcessor messagePostProcessor = new MessagePostProcessor() {
-                @Override
-                public Message postProcessMessage(Message message) throws AmqpException {
-                    message.getMessageProperties().setContentType("application/json");
-                    message.getMessageProperties().setContentEncoding("UTF-8");
-                    return message;
-                }
-            };
-            // Send message for redirect logs
-            rabbitTemplate.convertAndSend(exchange, routingKey, taskLog, messagePostProcessor);
-            log.info("Create pipelineRun for task \"{}:{}\" was successful", runtimeInfo.getProject(), taskInstanceId);
-            taskLog.setLogContent("Start to run task \"" + runtimeInfo.getProject() + " \"");
-            logService.insertLogToMongo(taskLog);
+            PipelineRun pipelineRun = task.createPipelineRun(kubernetesClient, namespace);
+            postPipelineRun(pipelineRun, runtimeInfo);
         } catch (RuntimeException e) {
+            TaskLog taskLog = this.generateTaskLog(runtimeInfo);
+            Long taskInstanceId = taskLog.getTaskInstanceId();
             log.error("Create pipelineRun for task \"{}:{}\"  was failed with an exception: {}",
-                    runtimeInfo.getProject(), taskInstanceId, e);
+                    runtimeInfo.getProject(), taskInstanceId, e.getMessage());
             taskLog = this.generateTaskLog(runtimeInfo);
             taskLog.setLogContent("Failed to run task \"" + runtimeInfo.getProject() + " \"");
             logService.insertLogToMongo(taskLog);
@@ -109,5 +110,54 @@ public class BuildListener {
         taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
         taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
         return taskLog;
+    }
+
+    private void postPipelineRun(PipelineRun pipelineRun, RuntimeInfo runtimeInfo) {
+        TektonClient tektonClient = kubernetesClient.adapt(TektonClient.class);
+        final CountDownLatch watchLatch = new CountDownLatch(1);
+        try (Watch ignored = tektonClient.v1().pipelineRuns().withName(pipelineRun.getMetadata().getName()).watch(
+                new Watcher<PipelineRun>() {
+                    @Override
+                    public void eventReceived(Action action, PipelineRun resource) {
+                        /* TODO
+                              Condition(lastTransitionTime=2023-09-04T15:03:16Z, message=Error retrieving pipeline for pipelinerun tekton-pipelines/task-git-ndkkr: error when listing pipelines for pipelineRun task-git-ndkkr: pipelines.tekton.dev "task-git" not found, reason=CouldntGetPipeline, severity=null, status=False, type=Succeeded, additionalProperties={})
+                         */
+                        Condition condition = resource.getStatus().getConditions().get(0);
+                        if (condition.getReason().equals("Running")) {
+                            TaskLog taskLog = generateTaskLog(runtimeInfo);
+                            rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+                            // Send message for redirect logs
+                            rabbitTemplate.convertAndSend(exchange, loggingRoutingKey, taskLog, messagePostProcessor);
+                            log.info("Created pipelineRun \"{}\" for task \"{}:{}\" successfully", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
+                            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + " \" successfully");
+                            logService.insertLogToMongo(taskLog);
+                        } else if (condition.getReason().equals("CouldntGetPipeline")) {
+                            TaskLog taskLog = generateTaskLog(runtimeInfo);
+                            log.info("Failed to run pipeline \"{}\" due to: {}", pipelineRun.getMetadata().getName(), condition.getMessage());
+                            taskLog.setLogContent("Failed to run pipeline \"" + pipelineRun.getMetadata().getName() + " \" due to: " + condition.getMessage());
+                            logService.insertLogToMongo(taskLog);
+                            // Send message to stop task execution
+                            JSONObject result = new JSONObject();
+                            try {
+                                result.put("taskInstanceId", String.valueOf(taskLog.getTaskInstanceId()));
+                                result.put("status", "FAILURE");
+                            } catch (JSONException e) {
+                                throw new RuntimeException(e);
+                            }
+                            rabbitTemplate.convertAndSend(exchange, endRoutingKey, result.toString(), messagePostProcessor);
+                        }
+                        watchLatch.countDown();
+                    }
+
+                    @Override
+                    public void onClose(WatcherException cause) {
+
+                    }
+                })) {
+            watchLatch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            log.error("Could not watch PipelineRun \"{}\" due to exception: {}", pipelineRun.getMetadata().getName(), interruptedException.getMessage());
+        }
     }
 }

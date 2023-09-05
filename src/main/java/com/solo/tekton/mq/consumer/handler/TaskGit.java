@@ -21,7 +21,7 @@ public class TaskGit implements BaseTask {
     @NonNull
     private RuntimeInfo runtimeInfo;
 
-    private String prepareResource(KubernetesClient k8sClient, Map<String, String> params) {
+    private String prepareResource(KubernetesClient k8sClient, String namespace, Map<String, String> params) {
         // create a 5 chars random string for secret name which starts with "auto-git-auth-"
         String token = params.get("CREDENTIALS_ID");
         String postfix = token.substring(token.length() / 3, token.length() / 2);
@@ -67,6 +67,7 @@ public class TaskGit implements BaseTask {
     public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
+        String gitServiceAccountName = prepareResource(k8sClient, namespace, params);
         String nodeSelector = params.get("TASK_NODE_SELECTOR");
         try {
             PipelineRun pipelineRun = new PipelineRunBuilder()
@@ -85,14 +86,14 @@ public class TaskGit implements BaseTask {
                     .endPipelineRef()
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("main")
-                            .withServiceAccountName(prepareResource(k8sClient, params))
+                            .withServiceAccountName(gitServiceAccountName)
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()
                             .build())
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("post")
-                            .withServiceAccountName(prepareResource(k8sClient, params))
+                            .withServiceAccountName(gitServiceAccountName)
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()

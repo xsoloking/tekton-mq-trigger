@@ -144,8 +144,9 @@ public class BuildListener {
                             }
                             rabbitTemplate.convertAndSend(exchange, endRoutingKey, result.toString(), messagePostProcessor);
                             watchLatch.countDown();
+                        } else {
+                            log.info("The status of PipelineRun \"{}\": Condition \"{}\"", pipelineRun.getMetadata().getName(), condition);
                         }
-                        log.info("The status of PipelineRun \"{}\": Condition \"{}\"", pipelineRun.getMetadata().getName(), condition.toString());
                     }
 
                     @Override

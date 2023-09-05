@@ -119,9 +119,6 @@ public class BuildListener {
                 new Watcher<PipelineRun>() {
                     @Override
                     public void eventReceived(Action action, PipelineRun resource) {
-                        /* TODO
-                              Condition(lastTransitionTime=2023-09-04T15:03:16Z, message=Error retrieving pipeline for pipelinerun tekton-pipelines/task-git-ndkkr: error when listing pipelines for pipelineRun task-git-ndkkr: pipelines.tekton.dev "task-git" not found, reason=CouldntGetPipeline, severity=null, status=False, type=Succeeded, additionalProperties={})
-                         */
                         Condition condition = resource.getStatus().getConditions().get(0);
                         if (condition.getReason().equals("Running")) {
                             TaskLog taskLog = generateTaskLog(runtimeInfo);
@@ -131,6 +128,7 @@ public class BuildListener {
                             log.info("Created pipelineRun \"{}\" for task \"{}:{}\" successfully", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
                             taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + " \" successfully");
                             logService.insertLogToMongo(taskLog);
+                            watchLatch.countDown();
                         } else if (condition.getReason().equals("CouldntGetPipeline")) {
                             TaskLog taskLog = generateTaskLog(runtimeInfo);
                             log.info("Failed to run pipeline \"{}\" due to: {}", pipelineRun.getMetadata().getName(), condition.getMessage());
@@ -145,8 +143,9 @@ public class BuildListener {
                                 throw new RuntimeException(e);
                             }
                             rabbitTemplate.convertAndSend(exchange, endRoutingKey, result.toString(), messagePostProcessor);
+                            watchLatch.countDown();
                         }
-                        watchLatch.countDown();
+                        log.info("The status of PipelineRun \"{}\": Condition \"{}\"", pipelineRun.getMetadata().getName(), condition.toString());
                     }
 
                     @Override
@@ -154,7 +153,7 @@ public class BuildListener {
 
                     }
                 })) {
-            watchLatch.await(5, TimeUnit.SECONDS);
+            watchLatch.await(10, TimeUnit.SECONDS);
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
             log.error("Could not watch PipelineRun \"{}\" due to exception: {}", pipelineRun.getMetadata().getName(), interruptedException.getMessage());

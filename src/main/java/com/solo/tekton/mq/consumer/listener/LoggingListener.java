@@ -30,11 +30,4 @@ public class LoggingListener {
         TaskLog taskLog = new ObjectMapper().readValue(message, TaskLog.class);
         logService.redirectLogs(taskLog);
     }
-//    public void receiveMessage(byte[] body) throws IOException {
-//        String msg = new String(body);
-//        log.info("Received message: " + msg);
-//        ObjectMapper mapper = new ObjectMapper();
-//        TaskLog taskLog = mapper.readValue(msg, TaskLog.class);
-//        logService.redirectLogs(taskLog);
-//    }
 }

@@ -119,20 +119,24 @@ public class BuildListener {
                 new Watcher<PipelineRun>() {
                     @Override
                     public void eventReceived(Action action, PipelineRun resource) {
-                        Condition condition = resource.getStatus().getConditions().get(0);
+                        Condition condition = resource.getStatus().getConditions().stream().findFirst().orElse(null);
+                        if (condition == null) {
+                            return;
+                        }
                         if (condition.getReason().equals("Running")) {
                             TaskLog taskLog = generateTaskLog(runtimeInfo);
+                            taskLog.setPodName(pipelineRun.getMetadata().getName() + "-main-pod");
                             rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
                             // Send message for redirect logs
                             rabbitTemplate.convertAndSend(exchange, loggingRoutingKey, taskLog, messagePostProcessor);
                             log.info("Created pipelineRun \"{}\" for task \"{}:{}\" successfully", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
-                            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + " \" successfully");
+                            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + "\" successfully");
                             logService.insertLogToMongo(taskLog);
                             watchLatch.countDown();
                         } else if (condition.getReason().equals("CouldntGetPipeline")) {
                             TaskLog taskLog = generateTaskLog(runtimeInfo);
                             log.info("Failed to run pipeline \"{}\" due to: {}", pipelineRun.getMetadata().getName(), condition.getMessage());
-                            taskLog.setLogContent("Failed to run pipeline \"" + pipelineRun.getMetadata().getName() + " \" due to: " + condition.getMessage());
+                            taskLog.setLogContent("Failed to run pipeline \"" + pipelineRun.getMetadata().getName() + "\" due to: " + condition.getMessage());
                             logService.insertLogToMongo(taskLog);
                             // Send message to stop task execution
                             JSONObject result = new JSONObject();

@@ -1,7 +1,11 @@
 package com.solo.tekton.mq.consumer.service;
 
 import com.solo.tekton.mq.consumer.data.TaskLog;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.Watch;
+import io.fabric8.kubernetes.client.Watcher;
+import io.fabric8.kubernetes.client.WatcherException;
 import io.fabric8.kubernetes.client.dsl.LogWatch;
 import io.fabric8.kubernetes.client.dsl.PodResource;
 import lombok.NonNull;
@@ -15,8 +19,7 @@ import org.springframework.stereotype.Service;
 import java.io.OutputStream;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -42,28 +45,35 @@ public class LogService {
      */
     @Async
     public void redirectLogs(TaskLog taskLog) {
-        log.info("Redirecting logs for task \"{}\"", taskLog.getTaskInstanceId());
         try {
-            Map<String, String> labelFilter = Map.of(
-                    "devops.flow/taskInstanceId", String.valueOf(taskLog.getTaskInstanceId()),
-                    "tekton.dev/pipelineTask", "main");
-            Optional<PodResource> podRes = kubernetesClient.pods()
-                    .inNamespace(namespace)
-                    .withLabels(labelFilter)
-                    .resources()
-                    .findFirst();
-            if (podRes.isEmpty()) {
-                taskLog.setLogContent("ERROR::no pod found for taskInstance: " + taskLog.getTaskInstanceId());
-                insertLogToMongo(taskLog);
-                log.info("no pod found for taskInstance: {}, log redirection was cancelled", taskLog.getTaskInstanceId());
-                return;
+            final CountDownLatch watchLatch = new CountDownLatch(1);
+            PodResource mainTaskPod = kubernetesClient.pods().inNamespace(namespace).withName(taskLog.getPodName());
+            try(Watch ignored = mainTaskPod.watch(new Watcher<Pod>() {
+                            @Override
+                            public void eventReceived(Action action, Pod resource) {
+                                if (resource.getStatus().getPhase().equals("Running")) {
+                                    watchLatch.countDown();
+                                } else {
+                                    log.info("Waiting for pod \"{}\" to start...", taskLog.getPodName());
+                                }
+                            }
+
+                            @Override
+                            public void onClose(WatcherException cause) {
+
+                            }
+                        })) {
+                boolean ready = watchLatch.await(60, TimeUnit.SECONDS);
+                if (!ready) {
+                    throw new RuntimeException("Timed out waiting for pod " + taskLog.getPodName() + " to start");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Unexpected interrupted exception: {}, stack trace: {}", e.getMessage(), e.getStackTrace());
+                throw new RuntimeException(e);
             }
-//            Object result = podRes.get().waitUntilCondition(  r -> r.getStatus().getPhase().equals("Running"), 5, TimeUnit.MINUTES);
-//            if ( result == null || result.equals(false)) {
-//                log.info("Task \"{}\" doesn't start to run in {} minutes, log redirection was cancelled", taskLog.getTaskInstanceId());
-//                return;
-//            }
-            LogWatch watch = podRes.get().watchLog(new OutputStream() {
+            log.info("Started to redirect logs for pod  \"{}\"", taskLog.getPodName());
+            LogWatch watch = mainTaskPod.watchLog(new OutputStream() {
                 @Override
                 public void write(int b) {
                     throw new RuntimeException("not used");
@@ -77,8 +87,9 @@ public class LogService {
                     }
                 }
             });
-            podRes.get().waitUntilCondition(r -> r.getStatus().getPhase().equals("Succeeded")
+            mainTaskPod.waitUntilCondition(r -> r.getStatus().getPhase().equals("Succeeded")
                     || r.getStatus().getPhase().equals("Terminated"), taskLog.getTimeout(), TimeUnit.MINUTES);
+            log.info("Finished to redirect logs for pod  \"{}\"", taskLog.getPodName());
         } catch (Exception e) {
             taskLog.setLogContent("An exception happened during log redirection: " + e.getMessage());
             insertLogToMongo(taskLog);
@@ -86,7 +97,7 @@ public class LogService {
         }
     }
 
-    @Async
+
     public void insertLogToMongo(TaskLog taskLog) {
         TaskLog newTaskLog = new TaskLog();
         newTaskLog.setTaskInstanceId(taskLog.getTaskInstanceId());

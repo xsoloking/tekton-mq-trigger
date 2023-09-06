@@ -23,7 +23,14 @@ public class TaskMaven implements BaseTask {
     public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
         TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
         Map<String, String> params = Common.getParams(runtimeInfo);
-        String nodeSelector = params.get("TASK_NODE_SELECTOR");
+        String nodeSelector = "kubernetes.io/os: \"linux\"";
+        if (params.containsKey("TASK_NODE_SELECTOR") && params.get("TASK_NODE_SELECTOR") != null) {
+            nodeSelector = params.get("TASK_NODE_SELECTOR");
+        }
+        String timeout = "30m";
+        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
+            timeout = params.get("TASK_TIMEOUT") + "m";
+        }
         try {
             PipelineRun pipelineRun = new PipelineRunBuilder()
                     .withNewMetadata()
@@ -66,6 +73,10 @@ public class TaskMaven implements BaseTask {
                             .withNewValue(params.get("taskInstanceId"))
                             .build())
                     .addToParams(new ParamBuilder()
+                            .withName("FLOW_INSTANCE_ID")
+                            .withNewValue(params.get("flowInstanceId"))
+                            .build())
+                    .addToParams(new ParamBuilder()
                             .withName("TASK_IMAGE")
                             .withNewValue(params.get("TASK_IMAGE"))
                             .build())
@@ -79,7 +90,7 @@ public class TaskMaven implements BaseTask {
                             .build())
                     .withNewTimeouts()
                     .withPipeline(Duration.parse("40m"))
-                    .withTasks(Duration.parse(params.get("TASK_TIMEOUT") + "m"))
+                    .withTasks(Duration.parse(timeout))
                     .withFinally(Duration.parse("2m"))
                     .endTimeouts()
                     .endSpec()

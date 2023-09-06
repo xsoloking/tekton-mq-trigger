@@ -26,7 +26,7 @@ public class LoggingListener {
             key = "${flow.mq.routing.key.logging}"
     ))
     public void onMessage(String message) throws JsonProcessingException {
-        log.info("Received message: " + message);
+        log.debug("LoggingListener::Received message: " + message);
         TaskLog taskLog = new ObjectMapper().readValue(message, TaskLog.class);
         logService.redirectLogs(taskLog);
     }

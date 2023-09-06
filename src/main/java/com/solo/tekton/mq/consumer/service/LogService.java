@@ -1,6 +1,7 @@
 package com.solo.tekton.mq.consumer.service;
 
 import com.solo.tekton.mq.consumer.data.TaskLog;
+import com.solo.tekton.mq.consumer.handler.RuntimeInfo;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
@@ -19,8 +20,11 @@ import org.springframework.stereotype.Service;
 import java.io.OutputStream;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import static com.solo.tekton.mq.consumer.utils.Common.getParams;
 
 @Service
 @Slf4j
@@ -119,5 +123,25 @@ public class LogService {
         }
         newTaskLog.setLogContent(msg);
         mongoTemplate.insert(newTaskLog, String.valueOf(taskLog.getTaskInstanceId()));
+    }
+
+    public void insertLogToMongo(RuntimeInfo info, String content) {
+        TaskLog taskLog = generateTaskLog(info);
+        taskLog.setLogContent(content);
+        insertLogToMongo(taskLog);
+    }
+
+    private TaskLog generateTaskLog(RuntimeInfo runtimeInfo) {
+        TaskLog taskLog = new TaskLog();
+        Map<String, String> params = getParams(runtimeInfo);
+        taskLog.setExecuteBatchId(Long.parseLong(params.get("executeBatchId")));
+        taskLog.setFlowInstanceId(Long.parseLong(params.get("flowInstanceId")));
+        taskLog.setNodeInstanceId(Long.parseLong(params.get("nodeInstanceId")));
+        taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
+        taskLog.setTimeout(30L);
+        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
+            taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
+        }
+        return taskLog;
     }
 }

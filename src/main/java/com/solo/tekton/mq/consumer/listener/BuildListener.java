@@ -63,7 +63,7 @@ public class BuildListener {
 
     @RabbitListener(queues = "${flow.mq.queue.triggered}")
     public void receiveMessage(byte[] body) throws IOException {
-        log.info("Received message: " + new String(body));
+        log.debug("BuildListener::Received message: " + new String(body));
         taskHandling(body);
     }
 
@@ -86,6 +86,10 @@ public class BuildListener {
         try {
             // Create pipelineRun
             PipelineRun pipelineRun = task.createPipelineRun(kubernetesClient, namespace);
+            log.debug("Created pipelineRun for task \"{}\": {}", runtimeInfo.getProject(), pipelineRun);
+            TaskLog taskLog = this.generateTaskLog(runtimeInfo);
+            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + "\"");
+            logService.insertLogToMongo(taskLog);
             postPipelineRun(pipelineRun, runtimeInfo);
         } catch (RuntimeException e) {
             TaskLog taskLog = this.generateTaskLog(runtimeInfo);
@@ -108,18 +112,27 @@ public class BuildListener {
         taskLog.setFlowInstanceId(Long.parseLong(params.get("flowInstanceId")));
         taskLog.setNodeInstanceId(Long.parseLong(params.get("nodeInstanceId")));
         taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
-        taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
+        taskLog.setTimeout(30L);
+        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
+            taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
+        }
         return taskLog;
     }
 
     private void postPipelineRun(PipelineRun pipelineRun, RuntimeInfo runtimeInfo) {
         TektonClient tektonClient = kubernetesClient.adapt(TektonClient.class);
         final CountDownLatch watchLatch = new CountDownLatch(1);
-        try (Watch ignored = tektonClient.v1().pipelineRuns().withName(pipelineRun.getMetadata().getName()).watch(
+        try (Watch ignored = tektonClient.v1().pipelineRuns().inNamespace(namespace).withName(pipelineRun.getMetadata().getName()).watch(
                 new Watcher<PipelineRun>() {
                     @Override
                     public void eventReceived(Action action, PipelineRun resource) {
-                        Condition condition = resource.getStatus().getConditions().stream().findFirst().orElse(null);
+                        Condition condition = null;
+                        try {
+                            condition = resource.getStatus().getConditions().stream().findFirst().orElse(null);
+                        } catch (Exception e) {
+                            log.debug("Failed to get condition for PipelineRun \"{}\": {}", pipelineRun.getMetadata().getName(),resource);
+                            return;
+                        }
                         if (condition == null) {
                             return;
                         }
@@ -129,8 +142,8 @@ public class BuildListener {
                             rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
                             // Send message for redirect logs
                             rabbitTemplate.convertAndSend(exchange, loggingRoutingKey, taskLog, messagePostProcessor);
-                            log.info("Created pipelineRun \"{}\" for task \"{}:{}\" successfully", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
-                            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + "\" successfully");
+                            log.info("PipelineRun \"{}\" for task \"{}:{}\" is running", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
+                            taskLog.setLogContent("PipelineRun \"" + pipelineRun.getMetadata().getName() + "\" is running");
                             logService.insertLogToMongo(taskLog);
                             watchLatch.countDown();
                         } else if (condition.getReason().equals("CouldntGetPipeline")) {

@@ -4,6 +4,7 @@ import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -18,6 +19,7 @@ import java.util.concurrent.Executor;
 
 @SpringBootApplication
 @EnableAsync
+@Slf4j
 public class TektonMqTriggerApplication {
 
 
@@ -96,6 +98,7 @@ public class TektonMqTriggerApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TektonMqTriggerApplication.class, args);
+		log.debug("TektonMqTriggerApplication started, ver: 0906-v0.5.4");
 	}
 
 }

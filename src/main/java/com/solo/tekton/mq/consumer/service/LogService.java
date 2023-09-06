@@ -92,7 +92,7 @@ public class LogService {
                 }
             });
             mainTaskPod.waitUntilCondition(r -> r.getStatus().getPhase().equals("Succeeded")
-                    || r.getStatus().getPhase().equals("Terminated"), taskLog.getTimeout(), TimeUnit.MINUTES);
+                    || r.getStatus().getPhase().equals("Failed"), taskLog.getTimeout(), TimeUnit.MINUTES);
             log.info("Finished to redirect logs for pod  \"{}\"", taskLog.getPodName());
         } catch (Exception e) {
             taskLog.setLogContent("An exception happened during log redirection: " + e.getMessage());

@@ -2,6 +2,7 @@ package com.solo.tekton.mq.consumer.handler;
 
 import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.kubernetes.api.model.Duration;
+import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.*;
@@ -50,6 +51,10 @@ public class TaskMaven implements BaseTask {
                             .withPipelineTaskName("main")
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
+                            .addToVolumes(new VolumeBuilder()
+                                    .withName("maven-cache")
+                                    .withNewHostPath("/root/cache/maven", "DirectoryOrCreate")
+                                    .build())
                             .endPodTemplate()
                             .build())
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
@@ -64,10 +69,10 @@ public class TaskMaven implements BaseTask {
                             .withName("data")
                             .withNewPersistentVolumeClaim(params.get("TASK_PVC_NAME"), false)
                             .build())
-                    .addToWorkspaces(new WorkspaceBindingBuilder()
-                            .withName("cache")
-                            .withNewPersistentVolumeClaim(params.get("TASK_CACHE_PVC_NAME"), false)
-                            .build())
+//                    .addToWorkspaces(new WorkspaceBindingBuilder()
+//                            .withName("cache")
+//                            .withNewPersistentVolumeClaim(params.get("TASK_CACHE_PVC_NAME"), false)
+//                            .build())
                     .addToParams(new ParamBuilder()
                             .withName("TASK_INSTANCE_ID")
                             .withNewValue(params.get("taskInstanceId"))

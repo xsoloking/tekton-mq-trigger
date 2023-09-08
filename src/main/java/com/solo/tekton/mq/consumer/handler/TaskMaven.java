@@ -53,7 +53,7 @@ public class TaskMaven implements BaseTask {
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .addToVolumes(new VolumeBuilder()
                                     .withName("maven-cache")
-                                    .withNewHostPath("/root/cache/maven", "DirectoryOrCreate")
+                                    .withNewHostPath("/data/cache/maven/repository", "DirectoryOrCreate")
                                     .build())
                             .endPodTemplate()
                             .build())

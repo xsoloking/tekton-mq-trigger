@@ -15,14 +15,24 @@ public class Common {
         return params;
     }
 
-    public static String extractGitServerUrl(String repoUrl) {
-        URI uri = URI.create(repoUrl);
+    public static String extractServerUrl(String url) {
+        URI uri = URI.create(url);
         String host = uri.getHost();
         int port = uri.getPort();
         if (port == -1) {
             return String.format("%s://%s", uri.getScheme(), host);
         }
         return String.format("%s://%s:%d", uri.getScheme(), host, port);
+    }
+
+    public static String extractServerHost(String url) {
+        URI uri = URI.create(url);
+        String host = uri.getHost();
+        int port = uri.getPort();
+        if (port == -1) {
+            return uri.getHost();
+        }
+        return String.format("%s:%d", host, port);
     }
 
     public static String generateWorkingPath(String repoUrl, String revision) {
@@ -35,4 +45,5 @@ public class Common {
         }
         return repoUrl.replace(serverUrl, "").replace(".git", "/" + revision);
     }
+
 }

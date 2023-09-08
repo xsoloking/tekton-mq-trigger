@@ -70,13 +70,14 @@ public class TaskDocker implements BaseTask {
         Map<String, String> params = Common.getParams(runtimeInfo);
         DockerBuildData[] buildData = null;
         try {
-            buildData = new ObjectMapper().readValue(Base64.getDecoder().decode(params.get("DOCKER_BUILD_DATA")), DockerBuildData[].class);
+            String json = new String(Base64.getDecoder().decode(params.get("DOCKER_BUILD_DATA")));
+            buildData = new ObjectMapper().readValue(json, DockerBuildData[].class);
         } catch (IOException e) {
-            log.error("The value of the parameter \"DOCKER_BUILD_DATA\" is invalid, the task will be skipped: {}", params.get("DOCKER_BUILD_DATA"));
+            log.error("The value of the parameter \"DOCKER_BUILD_DATA\" is invalid, the task will be skipped due to exception: {}", e);
         } 
 
         if (buildData == null || buildData.length == 0) {
-            log.error("The parameter \"DOCKER_BUILD_DATA\" is empty, the task will be skipped: {}", runtimeInfo);
+            log.error("The parameter \"DOCKER_BUILD_DATA\" is invalid, the task will be skipped: {}", runtimeInfo);
             throw new RuntimeException("The parameter \"DOCKER_BUILD_DATA\" is empty");
         }
         String serviceAccountName = "default";

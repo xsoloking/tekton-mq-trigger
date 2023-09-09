@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.jmx.export.annotation.ManagedResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -56,9 +57,10 @@ public class LogService {
                             @Override
                             public void eventReceived(Action action, Pod resource) {
                                 if (resource.getStatus().getPhase().equals("Running")) {
+                                    log.info("The pod \"{}\" is running", taskLog.getPodName());
                                     watchLatch.countDown();
                                 } else {
-                                    log.info("Waiting for pod \"{}\" to start...", taskLog.getPodName());
+                                    log.info("Waiting for pod \"{}\" to be ready ...", taskLog.getPodName());
                                 }
                             }
 
@@ -67,7 +69,7 @@ public class LogService {
 
                             }
                         })) {
-                boolean ready = watchLatch.await(60, TimeUnit.SECONDS);
+                boolean ready = watchLatch.await(120, TimeUnit.SECONDS);
                 if (!ready) {
                     throw new RuntimeException("Timed out waiting for pod " + taskLog.getPodName() + " to start");
                 }
@@ -77,7 +79,7 @@ public class LogService {
                 throw new RuntimeException(e);
             }
             log.info("Started to redirect logs for pod  \"{}\"", taskLog.getPodName());
-            LogWatch watch = mainTaskPod.watchLog(new OutputStream() {
+            LogWatch watch = mainTaskPod.inContainer("step-main").watchLog(new OutputStream() {
                 @Override
                 public void write(int b) {
                     throw new RuntimeException("not used");

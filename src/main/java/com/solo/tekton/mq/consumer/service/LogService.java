@@ -14,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.jmx.export.annotation.ManagedResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -79,7 +78,7 @@ public class LogService {
                 throw new RuntimeException(e);
             }
             log.info("Started to redirect logs for pod  \"{}\"", taskLog.getPodName());
-            LogWatch watch = mainTaskPod.inContainer("step-main").watchLog(new OutputStream() {
+            LogWatch watch = mainTaskPod.inContainer("step-executor").watchLog(new OutputStream() {
                 @Override
                 public void write(int b) {
                     throw new RuntimeException("not used");

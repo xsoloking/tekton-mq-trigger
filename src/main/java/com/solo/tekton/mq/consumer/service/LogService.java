@@ -57,6 +57,8 @@ public class LogService {
                             public void eventReceived(Action action, Pod resource) {
                                 if (resource.getStatus().getPhase().equals("Running")) {
                                     log.info("The pod \"{}\" is running", taskLog.getPodName());
+                                    taskLog.setLogContent("The pod \"" + taskLog.getPodName() + "\" is running");
+                                    insertLogToMongo(taskLog);
                                     watchLatch.countDown();
                                 } else {
                                     log.info("Waiting for pod \"{}\" to be ready ...", taskLog.getPodName());

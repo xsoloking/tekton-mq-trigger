@@ -143,7 +143,7 @@ public class BuildListener {
                             // Send message for redirect logs
                             rabbitTemplate.convertAndSend(exchange, loggingRoutingKey, taskLog, messagePostProcessor);
                             log.info("PipelineRun \"{}\" for task \"{}:{}\" is running", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
-                            taskLog.setLogContent("PipelineRun \"" + pipelineRun.getMetadata().getName() + "\" was started");
+                            taskLog.setLogContent("PipelineRun \"" + pipelineRun.getMetadata().getName() + "\" is running. Wait for the pod to start ...");
                             logService.insertLogToMongo(taskLog);
                             watchLatch.countDown();
                         } else if (condition.getReason().equals("CouldntGetPipeline")) {

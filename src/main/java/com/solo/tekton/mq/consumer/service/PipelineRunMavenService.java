@@ -1,29 +1,45 @@
-package com.solo.tekton.mq.consumer.handler;
+package com.solo.tekton.mq.consumer.service;
 
-import com.solo.tekton.mq.consumer.utils.Common;
+import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import io.fabric8.kubernetes.api.model.Duration;
 import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.*;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
 import java.util.Map;
 
-@RequiredArgsConstructor
+@Service
 @Slf4j
-public class TaskMaven implements BaseTask {
+public class PipelineRunMavenService implements PipelineRunService {
 
-    @NonNull
-    private RuntimeInfo runtimeInfo;
+    @Autowired
+    private TektonClient tektonClient;
+
+    @Autowired
+    private KubernetesClient kubernetesClient;
+
+    @Value("${flow.k8s.namespace}")
+    private String namespace;
+
+    @Value("${pipeline.run.post.task.service.account.name}")
+    private String serviceAccountForPostTask;
+
+    public final String TYPE = "JJB_Task_Maven";
 
     @Override
-    public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
-        TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
-        Map<String, String> params = Common.getParams(runtimeInfo);
+    public String getType() {
+        return TYPE;
+    }
+
+    @Override
+    public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
+        Map<String, String> params = runtimeInfo.getParams();
         String nodeSelector = "kubernetes.io/os: \"linux\"";
         if (params.containsKey("TASK_NODE_SELECTOR") && params.get("TASK_NODE_SELECTOR") != null) {
             nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -60,7 +76,7 @@ public class TaskMaven implements BaseTask {
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("post")
                             // TODO load the value of service account from configuration
-                            .withServiceAccountName("git-basic-auth-4-post-task")
+                            .withServiceAccountName(serviceAccountForPostTask)
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()

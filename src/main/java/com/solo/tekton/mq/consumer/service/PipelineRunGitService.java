@@ -1,73 +1,48 @@
-package com.solo.tekton.mq.consumer.handler;
+package com.solo.tekton.mq.consumer.service;
 
+import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.kubernetes.api.model.*;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.*;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
-@RequiredArgsConstructor
+@Service
 @Slf4j
-public class TaskGit implements BaseTask {
+public class PipelineRunGitService implements PipelineRunService {
 
-    @NonNull
-    private RuntimeInfo runtimeInfo;
+    @Autowired
+    private TektonClient tektonClient;
 
-    private String prepareResource(KubernetesClient k8sClient, String namespace, Map<String, String> params) {
-        // create a 5 chars random string for secret name which starts with "auto-git-auth-"
-        String token = params.get("CREDENTIALS_ID");
-        String postfix = token.substring(token.length() / 3, token.length() / 2);
-        String secretName = ("git-auth-" + postfix).toLowerCase();
-        String serviceAccountName = ("sa-with-secret-" + postfix).toLowerCase();
+    @Autowired
+    private KubernetesClient kubernetesClient;
 
-        Secret secret = new SecretBuilder()
-                .withApiVersion("v1")
-                .withKind("Secret")
-                .withNewMetadata()
-                .withNamespace(namespace)
-                .withName(secretName)
-                .addToAnnotations("tekton.dev/git-0", Common.extractServerUrl(params.get("GIT_URL")))
-                .endMetadata()
-                .withType("kubernetes.io/basic-auth")
-                .withStringData(new HashMap<>() {{
-                    put("username", "git");
-                    put("password", new String(Base64.getDecoder().decode(token)));
-                }})
-                .build();
-        k8sClient.secrets().resource(secret).serverSideApply();
+    @Value("${flow.k8s.namespace}")
+    private String namespace;
 
-        ServiceAccount serviceAccount = new ServiceAccountBuilder()
-                .withApiVersion("v1")
-                .withKind("ServiceAccount")
-                .withNewMetadata()
-                .withNamespace(namespace)
-                .withName(serviceAccountName)
-                .endMetadata()
-                .withSecrets()
-                .addToSecrets(new ObjectReferenceBuilder()
-                        .withKind("Secret")
-                        .withName(secretName)
-                        .withApiVersion("v1")
-                        .build())
-                .build();
-        k8sClient.serviceAccounts().resource(serviceAccount).serverSideApply();
+    @Value("${pipeline.run.post.task.service.account.name}")
+    private String serviceAccountForPostTask;
 
-        return serviceAccountName;
+    public final String TYPE = "JJB_Task_Git";
+
+    @Override
+    public String getType() {
+        return TYPE;
     }
 
     @Override
-    public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
-        TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
-        Map<String, String> params = Common.getParams(runtimeInfo);
-        String gitServiceAccountName = prepareResource(k8sClient, namespace, params);
+    public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
+        Map<String, String> params = runtimeInfo.getParams();
+        String gitServiceAccountName = prepareResource(params);
         String nodeSelector = "kubernetes.io/os: \"linux\"";
         if (params.containsKey("TASK_NODE_SELECTOR") && params.get("TASK_NODE_SELECTOR") != null) {
             nodeSelector = params.get("TASK_NODE_SELECTOR");
@@ -100,7 +75,7 @@ public class TaskGit implements BaseTask {
                             .build())
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("post")
-                            .withServiceAccountName(gitServiceAccountName)
+                            .withServiceAccountName(serviceAccountForPostTask)
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()
@@ -141,4 +116,48 @@ public class TaskGit implements BaseTask {
             throw new RuntimeException(e);
         }
     }
+
+
+    private String prepareResource(Map<String, String> params) {
+        // create a 5 chars random string for secret name which starts with "auto-git-auth-"
+        String token = params.get("CREDENTIALS_ID");
+        String postfix = token.substring(token.length() / 3, token.length() / 2);
+        String secretName = ("git-auth-" + postfix).toLowerCase();
+        String serviceAccountName = ("sa-with-secret-" + postfix).toLowerCase();
+
+        Secret secret = new SecretBuilder()
+                .withApiVersion("v1")
+                .withKind("Secret")
+                .withNewMetadata()
+                .withNamespace(namespace)
+                .withName(secretName)
+                .addToAnnotations("tekton.dev/git-0", Common.extractServerUrl(params.get("GIT_URL")))
+                .endMetadata()
+                .withType("kubernetes.io/basic-auth")
+                .withStringData(new HashMap<>() {{
+                    put("username", "git");
+                    put("password", new String(Base64.getDecoder().decode(token)));
+                }})
+                .build();
+        kubernetesClient.secrets().resource(secret).serverSideApply();
+
+        ServiceAccount serviceAccount = new ServiceAccountBuilder()
+                .withApiVersion("v1")
+                .withKind("ServiceAccount")
+                .withNewMetadata()
+                .withNamespace(namespace)
+                .withName(serviceAccountName)
+                .endMetadata()
+                .withSecrets()
+                .addToSecrets(new ObjectReferenceBuilder()
+                        .withKind("Secret")
+                        .withName(secretName)
+                        .withApiVersion("v1")
+                        .build())
+                .build();
+        kubernetesClient.serviceAccounts().resource(serviceAccount).serverSideApply();
+
+        return serviceAccountName;
+    }
+
 }

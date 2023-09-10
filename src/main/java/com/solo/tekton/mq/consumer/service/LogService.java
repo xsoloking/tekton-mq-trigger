@@ -1,7 +1,6 @@
 package com.solo.tekton.mq.consumer.service;
 
 import com.solo.tekton.mq.consumer.data.TaskLog;
-import com.solo.tekton.mq.consumer.handler.RuntimeInfo;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
@@ -20,11 +19,9 @@ import org.springframework.stereotype.Service;
 import java.io.OutputStream;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static com.solo.tekton.mq.consumer.utils.Common.getParams;
 
 @Service
 @Slf4j
@@ -57,8 +54,7 @@ public class LogService {
                             public void eventReceived(Action action, Pod resource) {
                                 if (resource.getStatus().getPhase().equals("Running")) {
                                     log.info("The pod \"{}\" is running", taskLog.getPodName());
-                                    taskLog.setLogContent("The pod \"" + taskLog.getPodName() + "\" is running");
-                                    insertLogToMongo(taskLog);
+                                    insertLogToMongo(taskLog, "The pod \"" + taskLog.getPodName() + "\" is running");
                                     watchLatch.countDown();
                                 } else {
                                     log.info("Waiting for pod \"{}\" to be ready ...", taskLog.getPodName());
@@ -89,8 +85,7 @@ public class LogService {
                 @Override
                 public void write(byte @NonNull [] b, int off, int len) {
                     for (String line : new String(b, off, len).trim().split("\n")) {
-                        taskLog.setLogContent(line);
-                        insertLogToMongo(taskLog);
+                        insertLogToMongo(taskLog, line);
                     }
                 }
             });
@@ -98,53 +93,33 @@ public class LogService {
                     || r.getStatus().getPhase().equals("Failed"), taskLog.getTimeout(), TimeUnit.MINUTES);
             log.info("Finished to redirect logs for pod  \"{}\"", taskLog.getPodName());
         } catch (Exception e) {
-            taskLog.setLogContent("An exception happened during log redirection: " + e.getMessage());
-            insertLogToMongo(taskLog);
+            insertLogToMongo(taskLog, "An exception happened during log redirection: " + e.getMessage());
             log.error("Redirecting logs for task \"{}\" was failed due to {}", taskLog.getTaskInstanceId(), e.getMessage());
         }
     }
 
 
-    public void insertLogToMongo(TaskLog taskLog) {
+    public void insertLogToMongo(TaskLog taskLog, String content) {
         TaskLog newTaskLog = new TaskLog();
         newTaskLog.setTaskInstanceId(taskLog.getTaskInstanceId());
         newTaskLog.setExecuteBatchId(taskLog.getExecuteBatchId());
         newTaskLog.setFlowInstanceId(taskLog.getFlowInstanceId());
         newTaskLog.setNodeInstanceId(taskLog.getNodeInstanceId());
+        newTaskLog.setLogContent(content);
         String timestamp = sdf.format(new Timestamp(System.currentTimeMillis()));
-        String msg = timestamp + " [INFO] " + taskLog.getLogContent();
+        String msg = timestamp + " [INFO] " + content;
         newTaskLog.setLogType(2);
-        if (taskLog.getLogContent().contains("ERROR") || taskLog.getLogContent().toLowerCase().contains("exception")) {
+        if (content.contains("ERROR") || content.toLowerCase().contains("exception")) {
             newTaskLog.setLogType(1);
-            msg = timestamp + " [ERROR] " + taskLog.getLogContent();
-        } else if (taskLog.getLogContent().toLowerCase().contains("warning")) {
+            msg = timestamp + " [ERROR] " + content;
+        } else if (content.toLowerCase().contains("warning")) {
             newTaskLog.setLogType(3);
-            msg = timestamp + " [WARNING] " + taskLog.getLogContent();
+            msg = timestamp + " [WARNING] " + content;
         }
-        if (taskLog.getLogContent().toLowerCase().contains("http://") || taskLog.getLogContent().toLowerCase().contains("https://")) {
+        if (content.toLowerCase().contains("http://") || content.toLowerCase().contains("https://")) {
             newTaskLog.setHtmlLog(true);
         }
         newTaskLog.setLogContent(msg);
         mongoTemplate.insert(newTaskLog, String.valueOf(taskLog.getTaskInstanceId()));
-    }
-
-    public void insertLogToMongo(RuntimeInfo info, String content) {
-        TaskLog taskLog = generateTaskLog(info);
-        taskLog.setLogContent(content);
-        insertLogToMongo(taskLog);
-    }
-
-    private TaskLog generateTaskLog(RuntimeInfo runtimeInfo) {
-        TaskLog taskLog = new TaskLog();
-        Map<String, String> params = getParams(runtimeInfo);
-        taskLog.setExecuteBatchId(Long.parseLong(params.get("executeBatchId")));
-        taskLog.setFlowInstanceId(Long.parseLong(params.get("flowInstanceId")));
-        taskLog.setNodeInstanceId(Long.parseLong(params.get("nodeInstanceId")));
-        taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
-        taskLog.setTimeout(30L);
-        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
-            taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
-        }
-        return taskLog;
     }
 }

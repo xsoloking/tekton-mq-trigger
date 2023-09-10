@@ -1,11 +1,12 @@
 package com.solo.tekton.mq.consumer.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import com.solo.tekton.mq.consumer.data.TaskLog;
-import com.solo.tekton.mq.consumer.handler.BaseTask;
-import com.solo.tekton.mq.consumer.handler.RuntimeInfo;
-import com.solo.tekton.mq.consumer.handler.TaskFactory;
+import com.solo.tekton.mq.consumer.factory.PipelineRunFactory;
 import com.solo.tekton.mq.consumer.service.LogService;
+import com.solo.tekton.mq.consumer.service.PipelineRunService;
+import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.knative.internal.pkg.apis.Condition;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.Watch;
@@ -26,11 +27,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import static com.solo.tekton.mq.consumer.utils.Common.getParams;
 
 
 @Component
@@ -82,42 +80,23 @@ public class BuildListener {
             log.error("Task wasn't handled, due to failed to parse message: " + new String(body));
             return;
         }
-        BaseTask task = TaskFactory.createTask(runtimeInfo);
+        TaskLog taskLog = Common.generateTaskLog(runtimeInfo);
+        PipelineRunService pipelineRunService = PipelineRunFactory.getPipelineRunService(runtimeInfo);
         try {
             // Create pipelineRun
-            PipelineRun pipelineRun = task.createPipelineRun(kubernetesClient, namespace);
+            PipelineRun pipelineRun = pipelineRunService.createPipelineRun(runtimeInfo);
             log.debug("Created pipelineRun for task \"{}\": {}", runtimeInfo.getProject(), pipelineRun);
-            TaskLog taskLog = this.generateTaskLog(runtimeInfo);
-            taskLog.setLogContent("Created pipelineRun \"" + pipelineRun.getMetadata().getName() + "\"");
-            logService.insertLogToMongo(taskLog);
+            logService.insertLogToMongo(taskLog, "Created pipelineRun \"" + pipelineRun.getMetadata().getName() + "\"");
             postPipelineRun(pipelineRun, runtimeInfo);
         } catch (RuntimeException e) {
-            TaskLog taskLog = this.generateTaskLog(runtimeInfo);
             Long taskInstanceId = taskLog.getTaskInstanceId();
             log.error("Create pipelineRun for task \"{}:{}\"  was failed with an exception: {}",
                     runtimeInfo.getProject(), taskInstanceId, e.getMessage());
-            taskLog = this.generateTaskLog(runtimeInfo);
-            taskLog.setLogContent("Failed to run task \"" + runtimeInfo.getProject() + " \"");
-            logService.insertLogToMongo(taskLog);
-            taskLog = this.generateTaskLog(runtimeInfo);
-            taskLog.setLogContent("Due to exception \"" + e.getMessage() + " \"");
-            logService.insertLogToMongo(taskLog);
+            logService.insertLogToMongo(taskLog, "Failed to run task \"" + runtimeInfo.getProject() + " \"");
+            logService.insertLogToMongo(taskLog, "Due to exception \"" + e.getMessage() + " \"");
         }
     }
 
-    private TaskLog generateTaskLog(RuntimeInfo runtimeInfo) {
-        TaskLog taskLog = new TaskLog();
-        Map<String, String> params = getParams(runtimeInfo);
-        taskLog.setExecuteBatchId(Long.parseLong(params.get("executeBatchId")));
-        taskLog.setFlowInstanceId(Long.parseLong(params.get("flowInstanceId")));
-        taskLog.setNodeInstanceId(Long.parseLong(params.get("nodeInstanceId")));
-        taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
-        taskLog.setTimeout(30L);
-        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
-            taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
-        }
-        return taskLog;
-    }
 
     private void postPipelineRun(PipelineRun pipelineRun, RuntimeInfo runtimeInfo) {
         TektonClient tektonClient = kubernetesClient.adapt(TektonClient.class);
@@ -136,21 +115,18 @@ public class BuildListener {
                         if (condition == null) {
                             return;
                         }
+                        TaskLog taskLog = Common.generateTaskLog(runtimeInfo);
+                        taskLog.setPodName(pipelineRun.getMetadata().getName() + "-main-pod");
                         if (condition.getReason().equals("Running")) {
-                            TaskLog taskLog = generateTaskLog(runtimeInfo);
-                            taskLog.setPodName(pipelineRun.getMetadata().getName() + "-main-pod");
                             rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
                             // Send message for redirect logs
                             rabbitTemplate.convertAndSend(exchange, loggingRoutingKey, taskLog, messagePostProcessor);
                             log.info("PipelineRun \"{}\" for task \"{}:{}\" is running", pipelineRun.getMetadata().getName(), runtimeInfo.getProject(), taskLog.getTaskInstanceId());
-                            taskLog.setLogContent("PipelineRun \"" + pipelineRun.getMetadata().getName() + "\" is running. Wait for the pod to start ...");
-                            logService.insertLogToMongo(taskLog);
+                            logService.insertLogToMongo(taskLog, "PipelineRun \"" + pipelineRun.getMetadata().getName() + "\" is running. Wait for the pod to start ...");
                             watchLatch.countDown();
                         } else if (condition.getReason().equals("CouldntGetPipeline")) {
-                            TaskLog taskLog = generateTaskLog(runtimeInfo);
                             log.info("Failed to run pipeline \"{}\" due to: {}", pipelineRun.getMetadata().getName(), condition.getMessage());
-                            taskLog.setLogContent("Failed to run pipeline \"" + pipelineRun.getMetadata().getName() + "\" due to: " + condition.getMessage());
-                            logService.insertLogToMongo(taskLog);
+                            logService.insertLogToMongo(taskLog, "Failed to run pipeline \"" + pipelineRun.getMetadata().getName() + "\" due to: " + condition.getMessage());
                             // Send message to stop task execution
                             JSONObject result = new JSONObject();
                             try {

@@ -1,15 +1,17 @@
-package com.solo.tekton.mq.consumer.handler;
+package com.solo.tekton.mq.consumer.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solo.tekton.mq.consumer.data.DockerBuildData;
+import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import com.solo.tekton.mq.consumer.utils.Common;
 import io.fabric8.kubernetes.api.model.*;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.*;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.text.ParseException;
@@ -17,64 +19,39 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
-@RequiredArgsConstructor
+@Service
 @Slf4j
-public class TaskDocker implements BaseTask {
+public class PipelineRunDockerService implements PipelineRunService {
 
-    @NonNull
-    private RuntimeInfo runtimeInfo;
+    @Autowired
+    private TektonClient tektonClient;
 
-    private String prepareResource(KubernetesClient k8sClient, String namespace, DockerBuildData data) {
-        // create a 5 chars random string for secret name which starts with "auto-git-auth-"
-        String secretName = ("docker-auth-" + data.getUsername()).toLowerCase();
-        String serviceAccountName = ("sa-with-secret-" + data.getUsername()).toLowerCase();
+    @Autowired
+    private KubernetesClient kubernetesClient;
 
-        Secret secret = new SecretBuilder()
-                .withApiVersion("v1")
-                .withKind("Secret")
-                .withNewMetadata()
-                .withNamespace(namespace)
-                .withName(secretName)
-                .addToAnnotations("tekton.dev/docker-0", data.getRepository())
-                .endMetadata()
-                .withType("kubernetes.io/basic-auth")
-                .withStringData(new HashMap<>() {{
-                    put("username", data.getUsername());
-                    put("password", new String(Base64.getDecoder().decode(data.getPassword())));
-                }})
-                .build();
-        k8sClient.secrets().resource(secret).serverSideApply();
+    @Value("${flow.k8s.namespace}")
+    private String namespace;
 
-        ServiceAccount serviceAccount = new ServiceAccountBuilder()
-                .withApiVersion("v1")
-                .withKind("ServiceAccount")
-                .withNewMetadata()
-                .withNamespace(namespace)
-                .withName(serviceAccountName)
-                .endMetadata()
-                .withSecrets()
-                .addToSecrets(new ObjectReferenceBuilder()
-                        .withKind("Secret")
-                        .withName(secretName)
-                        .withApiVersion("v1")
-                        .build())
-                .build();
-        k8sClient.serviceAccounts().resource(serviceAccount).serverSideApply();
+    @Value("${pipeline.run.post.task.service.account.name}")
+    private String serviceAccountForPostTask;
 
-        return serviceAccountName;
+    public final String TYPE = "JJB_Task_Docker";
+
+    @Override
+    public String getType() {
+        return TYPE;
     }
 
     @Override
-    public PipelineRun createPipelineRun(KubernetesClient k8sClient, String namespace) {
-        TektonClient tektonClient = k8sClient.adapt(TektonClient.class);
-        Map<String, String> params = Common.getParams(runtimeInfo);
+    public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
+        Map<String, String> params = runtimeInfo.getParams();
         DockerBuildData[] buildData = null;
         try {
             String json = new String(Base64.getDecoder().decode(params.get("DOCKER_BUILD_DATA")));
             buildData = new ObjectMapper().readValue(json, DockerBuildData[].class);
         } catch (IOException e) {
             log.error("The value of the parameter \"DOCKER_BUILD_DATA\" is invalid, the task will be skipped due to exception: {}", e);
-        } 
+        }
 
         if (buildData == null || buildData.length == 0) {
             log.error("The parameter \"DOCKER_BUILD_DATA\" is invalid, the task will be skipped: {}", runtimeInfo);
@@ -93,7 +70,7 @@ public class TaskDocker implements BaseTask {
         String output = "\"type=docker,dest=- . > image.tar\"";
         if (buildData[0].getRepository() != null && !buildData[0].getRepository().isEmpty()) {
             output = "type=registry,push=true,registry.insecure=true";
-            serviceAccountName = prepareResource(k8sClient, namespace, buildData[0]);
+            serviceAccountName = prepareResource(buildData[0]);
             dingExtraArgs = "--insecure-registry=" + Common.extractServerHost(buildData[0].getRepository());
         }
         StringBuilder buildExtraArgs = new StringBuilder();
@@ -124,7 +101,7 @@ public class TaskDocker implements BaseTask {
                             .build())
                     .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
                             .withPipelineTaskName("post")
-                            .withServiceAccountName("git-basic-auth-4-post-task")
+                            .withServiceAccountName(serviceAccountForPostTask)
                             .withNewPodTemplate()
                             .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
                             .endPodTemplate()
@@ -185,4 +162,45 @@ public class TaskDocker implements BaseTask {
             throw new RuntimeException(e);
         }
     }
+
+    private String prepareResource(DockerBuildData data) {
+        // create a 5 chars random string for secret name which starts with "auto-git-auth-"
+        String secretName = ("docker-auth-" + data.getUsername()).toLowerCase();
+        String serviceAccountName = ("sa-with-secret-" + data.getUsername()).toLowerCase();
+
+        Secret secret = new SecretBuilder()
+                .withApiVersion("v1")
+                .withKind("Secret")
+                .withNewMetadata()
+                .withNamespace(namespace)
+                .withName(secretName)
+                .addToAnnotations("tekton.dev/docker-0", data.getRepository())
+                .endMetadata()
+                .withType("kubernetes.io/basic-auth")
+                .withStringData(new HashMap<>() {{
+                    put("username", data.getUsername());
+                    put("password", new String(Base64.getDecoder().decode(data.getPassword())));
+                }})
+                .build();
+        kubernetesClient.secrets().resource(secret).serverSideApply();
+
+        ServiceAccount serviceAccount = new ServiceAccountBuilder()
+                .withApiVersion("v1")
+                .withKind("ServiceAccount")
+                .withNewMetadata()
+                .withNamespace(namespace)
+                .withName(serviceAccountName)
+                .endMetadata()
+                .withSecrets()
+                .addToSecrets(new ObjectReferenceBuilder()
+                        .withKind("Secret")
+                        .withName(secretName)
+                        .withApiVersion("v1")
+                        .build())
+                .build();
+        kubernetesClient.serviceAccounts().resource(serviceAccount).serverSideApply();
+
+        return serviceAccountName;
+    }
+
 }

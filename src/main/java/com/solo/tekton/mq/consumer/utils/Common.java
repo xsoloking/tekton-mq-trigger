@@ -1,19 +1,12 @@
 package com.solo.tekton.mq.consumer.utils;
 
-import com.solo.tekton.mq.consumer.handler.RuntimeInfo;
+import com.solo.tekton.mq.consumer.data.RuntimeInfo;
+import com.solo.tekton.mq.consumer.data.TaskLog;
 
 import java.net.URI;
-import java.util.HashMap;
 import java.util.Map;
 
 public class Common {
-
-    public static Map<String, String> getParams(RuntimeInfo runtimeInfo) {
-        Map<String, String> params = new HashMap<>();
-        runtimeInfo.getParameter()
-                .forEach(item -> params.put(item.get("name"), item.get("value")));
-        return params;
-    }
 
     public static String extractServerUrl(String url) {
         URI uri = URI.create(url);
@@ -44,6 +37,20 @@ public class Common {
             serverUrl = String.format("%s://%s/", uri.getScheme(), host);
         }
         return repoUrl.replace(serverUrl, "").replace(".git", "/" + revision);
+    }
+
+    public static TaskLog generateTaskLog(RuntimeInfo runtimeInfo) {
+        TaskLog taskLog = new TaskLog();
+        Map<String, String> params = runtimeInfo.getParams();
+        taskLog.setExecuteBatchId(Long.parseLong(params.get("executeBatchId")));
+        taskLog.setFlowInstanceId(Long.parseLong(params.get("flowInstanceId")));
+        taskLog.setNodeInstanceId(Long.parseLong(params.get("nodeInstanceId")));
+        taskLog.setTaskInstanceId(Long.parseLong(params.get("taskInstanceId")));
+        taskLog.setTimeout(30L);
+        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
+            taskLog.setTimeout(Long.parseLong(params.get("TASK_TIMEOUT")));
+        }
+        return taskLog;
     }
 
 }

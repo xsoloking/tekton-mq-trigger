@@ -1,11 +1,13 @@
 package com.solo.tekton.mq.consumer.service;
 
 import com.solo.tekton.mq.consumer.data.RuntimeInfo;
-import io.fabric8.kubernetes.api.model.Duration;
+import com.solo.tekton.mq.consumer.utils.TektonResourceBuilder;
 import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
-import io.fabric8.tekton.pipeline.v1.*;
+import io.fabric8.tekton.pipeline.v1.ParamBuilder;
+import io.fabric8.tekton.pipeline.v1.PipelineRun;
+import io.fabric8.tekton.pipeline.v1.PipelineRunBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +34,10 @@ public class PipelineRunMavenService implements PipelineRunService {
 
     public final String TYPE = "JJB_Task_Maven";
 
+    public final String PIPELINE_RUN_GENERATE_NAME = "task-maven-";
+
+    public final String REF_PIPELINE_NAME = "task-maven";
+
     @Override
     public String getType() {
         return TYPE;
@@ -40,62 +46,21 @@ public class PipelineRunMavenService implements PipelineRunService {
     @Override
     public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
         Map<String, String> params = runtimeInfo.getParams();
-        String nodeSelector = "kubernetes.io/os: \"linux\"";
-        if (params.containsKey("TASK_NODE_SELECTOR") && params.get("TASK_NODE_SELECTOR") != null) {
-            nodeSelector = params.get("TASK_NODE_SELECTOR");
-        }
-        String timeout = "30m";
-        if (params.containsKey("TASK_TIMEOUT") && params.get("TASK_TIMEOUT") != null) {
-            timeout = params.get("TASK_TIMEOUT") + "m";
+        String cachePath = "/data/cache/maven/repository";
+        if (params.get("TASK_CACHE_PVC_NAME") != null && !params.get("TASK_CACHE_PVC_NAME").isEmpty() ) {
+            String cachePvcName = params.get("TASK_CACHE_PVC_NAME");
+            cachePath = "/data/cache/" + params.get("systemId") + "/maven/" + cachePvcName;
+            if (cachePvcName.contains("platform")) {
+                cachePath = "/data/cache/platform/maven/" + cachePvcName;
+            }
         }
         try {
-            PipelineRun pipelineRun = new PipelineRunBuilder()
-                    .withNewMetadata()
-                    .withGenerateName("task-maven-")
-                    .withNamespace(namespace)
-                    .addToLabels("devops.flow/tenantId", params.get("tenantCode"))
-                    .addToLabels("devops.flow/systemId", params.get("systemId"))
-                    .addToLabels("devops.flow/flowId", params.get("flowId"))
-                    .addToLabels("devops.flow/flowInstanceId", params.get("flowInstanceId"))
-                    .addToLabels("devops.flow/taskInstanceId", params.get("taskInstanceId"))
-                    .endMetadata()
-                    .withNewSpec()
-                    .withNewPipelineRef()
-                    .withName("task-maven")
-                    .endPipelineRef()
-                    .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
-                            .withPipelineTaskName("main")
-                            .withNewPodTemplate()
-                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
-                            .addToVolumes(new VolumeBuilder()
-                                    .withName("maven-cache")
-                                    .withNewHostPath("/data/cache/maven/repository", "DirectoryOrCreate")
-                                    .build())
-                            .endPodTemplate()
-                            .build())
-                    .addToTaskRunSpecs(new PipelineTaskRunSpecBuilder()
-                            .withPipelineTaskName("post")
-                            // TODO load the value of service account from configuration
-                            .withServiceAccountName(serviceAccountForPostTask)
-                            .withNewPodTemplate()
-                            .addToNodeSelector(nodeSelector.split(": ")[0], nodeSelector.split(": ")[1].replaceAll("\"", ""))
-                            .endPodTemplate()
-                            .build())
-                    .addToWorkspaces(new WorkspaceBindingBuilder()
-                            .withName("data")
-                            .withNewPersistentVolumeClaim(params.get("TASK_PVC_NAME"), false)
-                            .build())
-//                    .addToWorkspaces(new WorkspaceBindingBuilder()
-//                            .withName("cache")
-//                            .withNewPersistentVolumeClaim(params.get("TASK_CACHE_PVC_NAME"), false)
-//                            .build())
+            PipelineRunBuilder pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilder(
+                    runtimeInfo, namespace, PIPELINE_RUN_GENERATE_NAME, REF_PIPELINE_NAME);
+            pipelineRunBuilder.editSpec()
                     .addToParams(new ParamBuilder()
-                            .withName("TASK_INSTANCE_ID")
-                            .withNewValue(params.get("taskInstanceId"))
-                            .build())
-                    .addToParams(new ParamBuilder()
-                            .withName("FLOW_INSTANCE_ID")
-                            .withNewValue(params.get("flowInstanceId"))
+                            .withName("WORKING_PATH")
+                            .withNewValue(params.get("SOURCE"))
                             .build())
                     .addToParams(new ParamBuilder()
                             .withName("TASK_IMAGE")
@@ -105,18 +70,19 @@ public class PipelineRunMavenService implements PipelineRunService {
                             .withName("TASK_SCRIPT")
                             .withNewValue(params.get("SCRIPT"))
                             .build())
-                    .addToParams(new ParamBuilder()
-                            .withName("WORKING_PATH")
-                            .withNewValue(params.get("SOURCE"))
-                            .build())
-                    .withNewTimeouts()
-                    .withPipeline(Duration.parse("40m"))
-                    .withTasks(Duration.parse(timeout))
-                    .withFinally(Duration.parse("2m"))
-                    .endTimeouts()
-                    .endSpec()
-                    .build();
-            return tektonClient.v1().pipelineRuns().resource(pipelineRun).create();
+                    .editFirstTaskRunSpec()
+                        .editPodTemplate()
+                        .addToVolumes(new VolumeBuilder()
+                                .withName("maven-cache")
+                                .withNewHostPath(cachePath, "DirectoryOrCreate")
+                                .build())
+                        .endPodTemplate()
+                    .endTaskRunSpec()
+                    .editLastTaskRunSpec()
+                    .withServiceAccountName(serviceAccountForPostTask)
+                    .endTaskRunSpec()
+                    .endSpec();
+            return tektonClient.v1().pipelineRuns().resource(pipelineRunBuilder.build()).create();
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }

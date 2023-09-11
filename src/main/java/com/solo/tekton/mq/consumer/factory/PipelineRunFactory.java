@@ -18,18 +18,18 @@ public class PipelineRunFactory {
     @Autowired
     private List<PipelineRunService> services;
 
-    private static final Map<String, PipelineRunService> pipelineRunServiceMap = new HashMap<>();
+    private static final Map<String, PipelineRunService> pipelineRunServiceFactory = new HashMap<>();
 
     @PostConstruct
-    public void initMyServiceCache() {
+    public void initPipelineRunFactory() {
         for(PipelineRunService service : services) {
-            pipelineRunServiceMap.put(service.getType(), service);
+            pipelineRunServiceFactory.put(service.getType(), service);
         }
     }
 
     public static PipelineRunService getPipelineRunService(RuntimeInfo runtimeInfo) {
-        PipelineRunService service = pipelineRunServiceMap.get(runtimeInfo.getProject());
-        if(service == null) throw new RuntimeException("Unknown service type: " + runtimeInfo.getProject());
+        PipelineRunService service = pipelineRunServiceFactory.get(runtimeInfo.getProject());
+        if(service == null) throw new RuntimeException("Unknown task type: " + runtimeInfo.getProject());
         return service;
     }
 

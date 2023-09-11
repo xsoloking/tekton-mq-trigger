@@ -14,7 +14,7 @@ public class TektonMqTriggerApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(TektonMqTriggerApplication.class, args);
-		log.debug("TektonMqTriggerApplication started, ver: 0910-v0.6.0");
+		log.debug("TektonMqTriggerApplication has started, ver: 0910-v0.6.1");
 	}
 
 }

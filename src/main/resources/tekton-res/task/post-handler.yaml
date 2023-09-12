@@ -33,7 +33,7 @@ spec:
       default: "."
     - name: taskImage
       description: task image
-      default: "soloking/post-handler:v0.2"
+      default: "registry.devops.yunbao/soloking/post-handler:v0.2"
     - name: task-script
       description: a script to handle main task results
       default: "common_post_handler.py"
@@ -61,5 +61,5 @@ spec:
         mkdir -p /workspace/post
         git config --global --add safe.directory "$WORKING_PATH"
         git config --global --add safe.directory "/workspace/post"
-        git clone https://github.com/xsoloking/postHandler.git -b main /workspace/post
+        git clone http://gitlab.devops.poc/devops/post-handler.git -b main /workspace/post
         python /workspace/post/script/$TASK_SCRIPT

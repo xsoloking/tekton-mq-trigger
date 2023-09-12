@@ -39,7 +39,7 @@ spec:
     default: ""
   - name: buildkit_image
     description: The location of the buildkit image.
-    default: moby/buildkit:master
+    default: registry.devops.yunbao/moby/buildkit:v0.12.2
   - name: dind_image
     description: The location of the docker-in-docker image.
     default: docker:dind

@@ -3,6 +3,7 @@ package com.solo.tekton.mq.consumer.runner;
 import io.fabric8.kubernetes.api.model.Secret;
 import io.fabric8.kubernetes.api.model.ServiceAccount;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.Pipeline;
 import io.fabric8.tekton.pipeline.v1.Task;
@@ -10,8 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,9 +28,6 @@ public class CreateUpdateTektonResourcesRunner implements CommandLineRunner {
     @Value("${flow.k8s.namespace}")
     private String namespace;
 
-    @Autowired
-    ApplicationContext applicationContext;
-
     /**
      * Callback used to run the bean.
      *
@@ -38,32 +36,49 @@ public class CreateUpdateTektonResourcesRunner implements CommandLineRunner {
      */
     @Override
     public void run(String... args) throws Exception {
-        // Load files from resources/tekton-res/dependencies and apply with kubernetesClient
-        Resource[] resources = applicationContext.getResources("classpath:/tekton-res/dependencies/secrets/*.*");
+        // Load files from resources/tekton-res/dependencies/secret and apply with kubernetesClient
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        Resource[] resources = resolver.getResources("classpath:/tekton-res/dependencies/secrets/*.yaml");
         for (Resource resource: resources) {
-            Secret res = kubernetesClient.secrets().load(resource.getFile()).item();
-            kubernetesClient.secrets().inNamespace(namespace).resource(res).serverSideApply();
+            Secret res = kubernetesClient.secrets().load(resource.getInputStream()).item();
+            try {
+                kubernetesClient.secrets().inNamespace(namespace).resource(res).serverSideApply();
+            } catch (KubernetesClientException e) {
+                log.warn("Create/update resource {} was failed due to exception: {}", resource.getFilename(), e.getMessage());
+            }
         }
 
-        // Load files from resources/tekton-res/dependencies and apply with kubernetesClient
-        resources = applicationContext.getResources("classpath:/tekton-res/dependencies/serviceAccounts/*.*");
+        // Load files from resources/tekton-res/dependencies/serviceAccounts and apply with kubernetesClient
+        resources = resolver.getResources("classpath:/tekton-res/dependencies/serviceAccounts/*.yaml");
         for (Resource resource: resources) {
-            ServiceAccount res = kubernetesClient.serviceAccounts().load(resource.getFile()).item();
-            kubernetesClient.serviceAccounts().inNamespace(namespace).resource(res).serverSideApply();
+            ServiceAccount res = kubernetesClient.serviceAccounts().load(resource.getInputStream()).item();
+            try {
+                kubernetesClient.serviceAccounts().inNamespace(namespace).resource(res).serverSideApply();
+            } catch (KubernetesClientException e) {
+                log.warn("Create/update resource {} was failed due to exception: {}", resource.getFilename(), e.getMessage());
+            }
         }
 
-        // Load files from resources/tekton-res/dependencies and apply with kubernetesClient
-        resources = applicationContext.getResources("classpath:/tekton-res/task/*.*");
+        // Load files from resources/tekton-res/task and apply with tektonClient
+        resources = resolver.getResources("classpath:/tekton-res/task/*.yaml");
         for (Resource resource: resources) {
-            Task res = tektonClient.v1().tasks().load(resource.getFile()).item();
-            tektonClient.v1().tasks().inNamespace(namespace).resource(res).serverSideApply();
+            Task res = tektonClient.v1().tasks().load(resource.getInputStream()).item();
+            try {
+                tektonClient.v1().tasks().inNamespace(namespace).resource(res).serverSideApply();
+            } catch (KubernetesClientException e) {
+                log.warn("Create/update resource {} was failed due to exception: {}", resource.getFilename(), e.getMessage());
+            }
         }
 
-        // Load files from resources/tekton-res/dependencies and apply with kubernetesClient
-        resources = applicationContext.getResources("classpath:/tekton-res/pipeline/*.*");
+        // Load files from resources/tekton-res/pipeline and apply with tektonClient
+        resources = resolver.getResources("classpath:/tekton-res/pipeline/*.yaml");
         for (Resource resource: resources) {
-            Pipeline res = tektonClient.v1().pipelines().load(resource.getFile()).item();
-            tektonClient.v1().pipelines().inNamespace(namespace).resource(res).serverSideApply();
+            Pipeline res = tektonClient.v1().pipelines().load(resource.getInputStream()).item();
+            try {
+                tektonClient.v1().pipelines().inNamespace(namespace).resource(res).serverSideApply();
+            } catch (KubernetesClientException e) {
+                log.warn("Create/update resource {} was failed due to exception: {}", resource.getFilename(), e.getMessage());
+            }
         }
     }
 }

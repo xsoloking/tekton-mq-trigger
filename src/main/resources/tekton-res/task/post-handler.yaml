@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: post-handler
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.38.0"
+    devops.flow/categories: "other"
+    tekton.dev/platforms: "linux/amd64,linux/arm64"
+spec:
+  description: >-
+    These Tasks are post tasks used to send message and extra data to rabbitmq,
+    it should be used in finally task of the Pipeline.
+  workspaces:
+    - name: data
+      description: The data of pipeline/task in this Workspace.
+      optional: true
+  params:
+    - name: main-task-status
+      type: string
+      description: main-task execution status
+      default: ""
+    - name: taskInstanceId
+      type: string
+      description: taskInstanceId is used to update task status
+    - name: flowInstanceId
+      type: string
+      description: flowInstanceId is used to update task status
+      default: ""
+    - name: working-path
+      description: dafault working path
+      default: "."
+    - name: taskImage
+      description: task image
+      default: "soloking/post-handler:v0.2"
+    - name: task-script
+      description: a script to handle main task results
+      default: "common_post_handler.py"
+  steps:
+    - name: executor
+      image: "$(params.taskImage)"
+      workingDir: "$(workspaces.data.path)/$(params.working-path)"
+      env:
+      - name: MAIN_TASK_STATUS
+        value: "$(params.main-task-status)"
+      - name: TASK_INSTANCE_ID
+        value: "$(params.taskInstanceId)"
+      - name: FLOW_INSTANCE_ID
+        value: "$(params.flowInstanceId)"
+      - name: WORKING_PATH
+        value: "$(workspaces.data.path)/$(params.working-path)"
+      - name: TASK_SCRIPT
+        value: "$(params.task-script)"
+#      securityContext:
+#        runAsNonRoot: true
+#        runAsUser: 65532
+      script: |
+        #!/usr/bin/env bash
+        rm -rf /workspace/post
+        mkdir -p /workspace/post
+        git config --global --add safe.directory "$WORKING_PATH"
+        git config --global --add safe.directory "/workspace/post"
+        git clone https://github.com/xsoloking/postHandler.git -b main /workspace/post
+        python /workspace/post/script/$TASK_SCRIPT

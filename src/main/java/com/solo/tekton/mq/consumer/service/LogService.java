@@ -53,9 +53,9 @@ public class LogService {
                             @Override
                             public void eventReceived(Action action, Pod resource) {
                                 if (resource.getStatus().getPhase().equals("Running")) {
+                                    watchLatch.countDown();
                                     log.info("The pod \"{}\" is running", taskLog.getPodName());
                                     insertLogToMongo(taskLog, "The pod \"" + taskLog.getPodName() + "\" is running");
-                                    watchLatch.countDown();
                                 } else {
                                     log.info("Waiting for pod \"{}\" to be ready ...", taskLog.getPodName());
                                 }
@@ -66,7 +66,7 @@ public class LogService {
 
                             }
                         })) {
-                boolean ready = watchLatch.await(120, TimeUnit.SECONDS);
+                boolean ready = watchLatch.await(60, TimeUnit.SECONDS);
                 if (!ready) {
                     throw new RuntimeException("Timed out waiting for pod " + taskLog.getPodName() + " to start");
                 }

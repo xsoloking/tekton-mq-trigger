@@ -1,0 +1,51 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: maven
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.38.0"
+    devops.flow/categories: "other"
+    tekton.dev/platforms: "linux/amd64,linux/arm64"
+spec:
+  description: >-
+    These Tasks are used to execute bash script in the Pipeline.
+  workspaces:
+    - name: data
+      description: The data of pipeline/task in this Workspace.
+    - name: cache
+      description: m2 cache shared in maven task
+      optional: true
+  params:
+    - name: working-path
+      description: dafault working path
+      default: "."
+    - name: taskImage
+      description: task image
+      default: "maven:3.8.5-openjdk-17"
+    - name: task-script
+      description: bash script encoded with base64
+      default: "bXZuIGNsZWFuIHBhY2thZ2UgLURtYXZlbi50ZXN0LnNraXA9dHJ1ZQo="
+  steps:
+    - name: executor
+      image: "$(params.taskImage)"
+      workingDir: "$(workspaces.data.path)/$(params.working-path)"
+      env:
+      - name: WORKING_PATH
+        value: "$(workspaces.data.path)/$(params.working-path)"
+      - name: TASK_SCRIPT
+        value: "$(params.task-script)"
+#      securityContext:
+#        runAsNonRoot: true
+#        runAsUser: 65532
+      volumeMounts:
+      - name: maven-cache
+        mountPath: /root/.m2/repository
+      script: |
+        #!/usr/bin/env sh
+        if [ -d "/workspace/cache" ]; then
+          mkdir -p /root/.m2/repository
+          ln -s /workspace/cache /root/.m2/repository
+        fi
+        echo $TASK_SCRIPT | base64 -d | sh

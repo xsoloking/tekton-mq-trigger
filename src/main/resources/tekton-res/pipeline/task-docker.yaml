@@ -1,0 +1,78 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: task-docker
+spec:
+  workspaces:
+  - name: data
+  params:
+    - name: TASK_INSTANCE_ID
+      description: "taskInstanceId is used to update results"
+    - name: FLOW_INSTANCE_ID
+      description: "flowInstanceId is used to update results"
+    - name: WORKING_PATH
+      description: "default working path"
+      default: "."
+    - name: TASK_IMAGE
+      description: "container image used by maven task"
+      default: "docker:dind"
+    - name: DOCKERFILE
+      description: Path to the Dockerfile to build.
+      default: Dockerfile
+    - name: CONTENT
+      description: Path to the directory to use as context.
+      default: .
+    - name: OUTPUT
+      description: Output destination (format type=local,dest=path)
+      default: "type=registry,push=true,registry.insecure=true"
+    - name: PLATFORM
+      description: Set target platform for build (format linux/amd64,linux/arm64)
+      default: linux/amd64
+    - name: BUILD_EXTRA_ARGS
+      description: Extra parameters passed for the build command when building images.
+      default: ""
+    - name: DIND_EXTRA_ARGS
+      description: Extra parameters passed for starting dind
+      default: "--insecure-registry=harbor.byai.uk"
+  tasks:
+    - name: main
+      taskRef:
+        name: docker
+      params:
+        - name: working-path
+          value: $(params.WORKING_PATH)
+        - name: dind_image
+          value: $(params.TASK_IMAGE)
+        - name: dockerfile
+          value: $(params.DOCKERFILE)
+        - name: context
+          value: $(params.CONTENT)
+        - name: output
+          value: $(params.OUTPUT)
+        - name: platform
+          value: $(params.PLATFORM)
+        - name: build_extra_args
+          value:  $(params.BUILD_EXTRA_ARGS)
+        - name: dind_extra_args
+          value: $(params.DIND_EXTRA_ARGS)
+      workspaces:
+        - name: data
+          workspace: data
+  finally:
+    - name: post
+      taskRef:
+        name: post-handler
+      params:
+        - name: main-task-status
+          value: "$(tasks.main.status)"
+        - name: taskInstanceId
+          value: $(params.TASK_INSTANCE_ID)
+        - name: flowInstanceId
+          value: $(params.FLOW_INSTANCE_ID)
+        - name: working-path
+          value: $(params.WORKING_PATH)
+        - name: task-script
+          value: "task_docker_post_handler.py"
+      workspaces:
+        - name: data
+          workspace: data

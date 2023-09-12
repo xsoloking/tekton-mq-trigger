@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-basic-auth
+  annotations:
+    tekton.dev/docker-0: http://harbor.byai.uk
+type: kubernetes.io/basic-auth
+stringData:
+  username: admin
+  password: admin@123_
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: docker-basic-auth
+secrets:
+  - name: docker-basic-auth

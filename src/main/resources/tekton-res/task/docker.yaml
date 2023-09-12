@@ -1,0 +1,102 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: docker
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/platforms: "linux/amd64,linux/arm64"
+spec:
+  workspaces:
+    - name: data
+  description: >-
+    This task will build and push an image using docker.
+    The task will build an out image out of a Dockerfile.
+    This image will be pushed to an image registry.
+    The image will be built and pushed using a dind sidecar over TCP+TLS.
+  params:
+  - name: working-path
+    description: dafault working path
+    default: "."
+  - name: dockerfile
+    description: Path to the Dockerfile to build.
+    default: ./Dockerfile
+  - name: context
+    description: Path to the directory to use as context.
+    default: .
+  - name: output
+    description: Output destination (format type=local,dest=path)
+    default: "type=registry,push=true,registry.insecure=true"
+  - name: platform
+    description: Set target platform for build (format linux/amd64,linux/arm64)
+    default: linux/amd64
+  - name: metadata-file
+    description: Path to the directory to use as context.
+    default: metadata.json
+  - name: build_extra_args
+    description: Extra parameters passed for the build command when building images.
+    default: ""
+  - name: buildkit_image
+    description: The location of the buildkit image.
+    default: moby/buildkit:master
+  - name: dind_image
+    description: The location of the docker-in-docker image.
+    default: docker:dind
+  - name: dind_extra_args
+    description: Extra parameters passed for starting dind
+    default: "--insecure-registry=harbor.byai.uk"
+  steps:
+  - name: executor
+    image: $(params.dind_image)
+    args:
+      - --storage-driver=vfs
+      - --userland-proxy=false
+      - --insecure-registry=$(params.dind_extra_args)
+    env:
+      - name: DOCKER_TLS_CERTDIR
+        value: "/certs"
+    workingDir: "$(workspaces.data.path)/$(params.working-path)"
+    securityContext:
+      privileged: true
+    script: |
+        #!/usr/bin/env sh
+        docker buildx create --name builder --driver=remote tcp://127.0.0.1:1234 --bootstrap --use
+        docker buildx build --output  $(params.output) \
+          --file $(params.dockerfile) \
+          --platform $(params.platform) \
+          --metadata-file $(params.metadata-file) \
+          $(params.build_extra_args) $(params.context)
+    volumeMounts:
+      - name: dind-certs
+        mountPath: /certs
+  sidecars:
+  - image: $(params.buildkit_image)
+    volumeMounts:
+      - name: buildkitd-config
+        mountPath: /etc/buildkit/buildkitd.toml
+        subPath: buildkitd.toml
+    readinessProbe:
+      exec:
+        command:
+          - buildctl
+          - debug
+          - workers
+      initialDelaySeconds: 5
+      periodSeconds: 30
+    livenessProbe:
+      exec:
+        command:
+          - buildctl
+          - debug
+          - workers
+      initialDelaySeconds: 5
+      periodSeconds: 30
+    securityContext:
+      privileged: true
+  volumes:
+  - name: dind-certs
+    emptyDir: {}
+  - name: buildkitd-config
+    configMap:
+      name: buildkitd-config

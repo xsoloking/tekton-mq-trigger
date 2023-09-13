@@ -18,5 +18,5 @@ public class TaskLog implements Serializable {
     public boolean htmlLog;
     public int logType;
     public long timeout;
-    public String podName;
+    public String pipelineRunName;
 }

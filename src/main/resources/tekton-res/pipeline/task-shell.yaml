@@ -22,7 +22,7 @@ spec:
   tasks:
     - name: main
       taskRef:
-        name: npm
+        name: shell
       params:
         - name: working-path
           value: $(params.WORKING_PATH)

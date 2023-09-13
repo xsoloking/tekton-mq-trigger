@@ -1,0 +1,54 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    devops.flow/flowId: '123456789'
+    devops.flow/flowInstanceId: '123456789'
+    devops.flow/systemId: '123456789'
+    devops.flow/taskInstanceId: '123456789'
+    devops.flow/tenantId: '1'
+  generateName: task-maven-
+  namespace: default
+spec:
+  params:
+    - name: TASK_INSTANCE_ID
+      value: '123456789'
+    - name: FLOW_INSTANCE_ID
+      value: '123456789'
+    - name: TASK_IMAGE
+      value: "maven:3.8.5-openjdk-17"
+    - name: TASK_SCRIPT
+      value: "c2V0IC14OyBjZCBjb21wbGV0ZTsgIG12biBjbGVhbiBwYWNrYWdlIC1EbWF2ZW4udGVzdC5za2lwPXRydWUgLURtYXZlbi5yZXBvLmxvY2FsPS9yb290Ly5tMi8gCg=="
+    - name: WORKING_PATH
+      value: spring-guides/gs-accessing-data-mongodb/main
+  pipelineRef:
+    name: task-maven
+  taskRunSpecs:
+    - pipelineTaskName: main
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+        volumes:
+        - name: maven-cache
+          hostPath:
+            path: /root/cache
+            type: DirectoryOrCreate
+      serviceAccountName: sa-with-secret-unix0cxutvqaerss2dkog
+    - pipelineTaskName: post
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+      serviceAccountName: sa-with-secret-unix0cxutvqaerss2dkog
+  taskRunTemplate:
+    serviceAccountName: default
+  timeouts:
+    finally: 2m0s
+    pipeline: 40m0s
+    tasks: 30m0s
+  workspaces:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-03
+#    - name: cache
+#      persistentVolumeClaim:
+#        claimName: maven-cache

@@ -2,6 +2,7 @@ package com.solo.tekton.mq.consumer.utils;
 
 import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import io.fabric8.kubernetes.api.model.Duration;
+import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.tekton.pipeline.v1.*;
 
 import java.text.ParseException;
@@ -9,10 +10,9 @@ import java.util.Map;
 
 public class TektonResourceBuilder {
 
-    public static PipelineRunBuilder createPipelineRunBuilder(RuntimeInfo runtimeInfo,
-                                                              String namespace,
-                                                              String generateName,
-                                                              String refPipelineName) throws ParseException {
+    public static PipelineRunBuilder createPipelineRunBuilder(
+            RuntimeInfo runtimeInfo, String namespace, String generateName, String refPipelineName
+    ) throws ParseException {
         Map<String, String> params = runtimeInfo.getParams();
         String nodeSelector = "kubernetes.io/os: \"linux\"";
         if (params.containsKey("TASK_NODE_SELECTOR") && params.get("TASK_NODE_SELECTOR") != null) {
@@ -66,6 +66,48 @@ public class TektonResourceBuilder {
                 .withTasks(Duration.parse(taskTimeout + "m"))
                 .withFinally(Duration.parse("3m"))
                 .endTimeouts()
+                .endSpec();
+        return pipelineRunBuilder;
+    }
+
+    public static PipelineRunBuilder createPipelineRunBuilderForShell(
+            RuntimeInfo runtimeInfo, String namespace, String generateName, String refPipelineName
+    ) throws ParseException {
+        Map<String, String> params = runtimeInfo.getParams();
+        PipelineRunBuilder pipelineRunBuilder = createPipelineRunBuilder(
+                runtimeInfo, namespace, generateName, refPipelineName);
+        pipelineRunBuilder.editSpec()
+                .addToParams(new ParamBuilder()
+                        .withName("WORKING_PATH")
+                        .withNewValue(params.get("SOURCE"))
+                        .build())
+                .addToParams(new ParamBuilder()
+                        .withName("TASK_IMAGE")
+                        .withNewValue(params.get("TASK_IMAGE"))
+                        .build())
+                .addToParams(new ParamBuilder()
+                        .withName("TASK_SCRIPT")
+                        .withNewValue(params.get("SCRIPT"))
+                        .build())
+                .endSpec();
+        return pipelineRunBuilder;
+    }
+
+    public static PipelineRunBuilder createPipelineRunBuilderForShellWithCache(
+            RuntimeInfo runtimeInfo, String namespace, String generateName, String refPipelineName, String cachePath
+    ) throws ParseException {
+        Map<String, String> params = runtimeInfo.getParams();
+        PipelineRunBuilder pipelineRunBuilder = createPipelineRunBuilderForShell(
+                runtimeInfo, namespace, generateName, refPipelineName);
+        pipelineRunBuilder.editSpec()
+                .editFirstTaskRunSpec()
+                .editPodTemplate()
+                .addToVolumes(new VolumeBuilder()
+                        .withName("build-cache")
+                        .withNewHostPath(cachePath, "DirectoryOrCreate")
+                        .build())
+                .endPodTemplate()
+                .endTaskRunSpec()
                 .endSpec();
         return pipelineRunBuilder;
     }

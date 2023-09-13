@@ -1,0 +1,24 @@
+#https://tekton.dev/docs/pipelines/auth/#configuring-basic-auth-authentication-for-git
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: git-clone-with-ssh-
+  namespace: default
+spec:
+  params:
+    - name: url
+      value: git@github.com:xsoloking/jenkins-shared-libraries.git
+    - name: revision
+      value: dev
+  serviceAccountName: test-task-robot-git-ssh
+  taskRef:
+    kind: Task
+    name: git-clone
+  timeout: 1h0m0s
+  workspaces:
+    - name: output
+      persistentVolumeClaim:
+        claimName: test-01
+    - name: ssh-directory
+      secret:
+        secretName: test-git-ssh

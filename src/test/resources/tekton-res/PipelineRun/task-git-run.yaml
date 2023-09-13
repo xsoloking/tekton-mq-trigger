@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    devops.flow/flowId: '123456789'
+    devops.flow/flowInstanceId: '123456789'
+    devops.flow/systemId: '123456789'
+    devops.flow/taskInstanceId: '123456789'
+    devops.flow/tenantId: '1'
+  generateName: task-git-
+  namespace: default
+spec:
+  params:
+    - name: TASK_INSTANCE_ID
+      value: '123456789'
+    - name: REPO_URL
+      value: https://github.com/xsoloking/jenkins-shared-libraries.git
+    - name: REPO_REVISION
+      value: dev
+    - name: WORKING_PATH
+      value: xsoloking/jenkins-shared-libraries/dev
+  pipelineRef:
+    name: task-git
+  taskRunSpecs:
+    - pipelineTaskName: main
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+      serviceAccountName: sa-with-secret-unix0cxutvqaerss2dkog
+    - pipelineTaskName: post
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+      serviceAccountName: sa-with-secret-unix0cxutvqaerss2dkog
+  taskRunTemplate:
+    serviceAccountName: default
+  timeouts:
+    finally: 2m0s
+    pipeline: 40m0s
+    tasks: 30m0s
+  workspaces:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-02

@@ -47,17 +47,18 @@ public class LogService {
     @Async
     public void redirectLogs(TaskLog taskLog) {
         try {
+            String podName = taskLog.getPipelineRunName() + "-main-pod";
             final CountDownLatch watchLatch = new CountDownLatch(1);
-            PodResource mainTaskPod = kubernetesClient.pods().inNamespace(namespace).withName(taskLog.getPodName());
+            PodResource mainTaskPod = kubernetesClient.pods().inNamespace(namespace).withName(podName);
             try(Watch ignored = mainTaskPod.watch(new Watcher<Pod>() {
                             @Override
                             public void eventReceived(Action action, Pod resource) {
                                 if (resource.getStatus().getPhase().equals("Running")) {
                                     watchLatch.countDown();
-                                    log.info("The pod \"{}\" is running", taskLog.getPodName());
-                                    insertLogToMongo(taskLog, "The pod \"" + taskLog.getPodName() + "\" is running");
+                                    log.info("The pod \"{}\" is running", podName);
+                                    insertLogToMongo(taskLog, "The pod \"" + podName + "\" is running");
                                 } else {
-                                    log.info("Waiting for pod \"{}\" to be ready ...", taskLog.getPodName());
+                                    log.info("Waiting for pod \"{}\" to be ready ...", podName);
                                 }
                             }
 
@@ -68,14 +69,14 @@ public class LogService {
                         })) {
                 boolean ready = watchLatch.await(60, TimeUnit.SECONDS);
                 if (!ready) {
-                    throw new RuntimeException("Timed out waiting for pod " + taskLog.getPodName() + " to start");
+                    throw new RuntimeException("Timed out waiting for pod " + podName + " to start");
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("Unexpected interrupted exception: {}, stack trace: {}", e.getMessage(), e.getStackTrace());
                 throw new RuntimeException(e);
             }
-            log.info("Started to redirect logs for pod  \"{}\"", taskLog.getPodName());
+            log.info("Started to redirect logs for pod  \"{}\"", podName);
             LogWatch watch = mainTaskPod.inContainer("step-executor").watchLog(new OutputStream() {
                 @Override
                 public void write(int b) {
@@ -91,7 +92,8 @@ public class LogService {
             });
             mainTaskPod.waitUntilCondition(r -> r.getStatus().getPhase().equals("Succeeded")
                     || r.getStatus().getPhase().equals("Failed"), taskLog.getTimeout(), TimeUnit.MINUTES);
-            log.info("Finished to redirect logs for pod  \"{}\"", taskLog.getPodName());
+            log.info("Finished to redirect logs for pod  \"{}\"", podName);
+            // TODO delete the PipelineRun
         } catch (Exception e) {
             insertLogToMongo(taskLog, "An exception happened during log redirection: " + e.getMessage());
             log.error("Redirecting logs for task \"{}\" was failed due to {}", taskLog.getTaskInstanceId(), e.getMessage());

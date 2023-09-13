@@ -1,0 +1,24 @@
+#https://tekton.dev/docs/pipelines/auth/#configuring-basic-auth-authentication-for-git
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: git-task-basic-auth-
+  namespace: default
+spec:
+  params:
+    - name: url
+      value: https://github.com/xsoloking/jenkins-shared-libraries.git
+    - name: revision
+      value: dev
+  podTemplate:
+    securityContext:
+      fsGroup: 65532
+  serviceAccountName: build-bot
+  taskRef:
+    kind: Task
+    name: git-clone
+  timeout: 1h0m0s
+  workspaces:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-02

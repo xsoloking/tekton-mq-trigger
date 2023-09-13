@@ -16,7 +16,7 @@ import java.util.Map;
 
 @Service
 @Slf4j
-public class PipelineRunMavenService implements PipelineRunService {
+public class PipelineRunShellService implements PipelineRunService {
 
     @Autowired
     private TektonClient tektonClient;
@@ -30,15 +30,11 @@ public class PipelineRunMavenService implements PipelineRunService {
     @Value("${pipeline.run.post.task.service.account.name}")
     private String serviceAccountForPostTask;
 
-    public final String TYPE = "JJB_Task_Maven";
+    public final String TYPE = "JJB_Task_Bash";
 
-    public final String PIPELINE_RUN_GENERATE_NAME = "task-maven-";
+    public final String PIPELINE_RUN_GENERATE_NAME = "task-shell-";
 
-    public final String REF_PIPELINE_NAME = "task-maven";
-
-    public String cachePath = "/data/cache/maven/repository";
-
-    public final String cacheType = "maven";
+    public final String REF_PIPELINE_NAME = "task-shell";
 
     @Override
     public String getType() {
@@ -48,16 +44,9 @@ public class PipelineRunMavenService implements PipelineRunService {
     @Override
     public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
         Map<String, String> params = runtimeInfo.getParams();
-        if (params.get("TASK_CACHE_PVC_NAME") != null && !params.get("TASK_CACHE_PVC_NAME").isEmpty() ) {
-            String cachePvcName = params.get("TASK_CACHE_PVC_NAME");
-            cachePath = "/data/cache/" + params.get("systemId") + "/" + cacheType + "/" + cachePvcName;
-            if (cachePvcName.contains("platform")) {
-                cachePath = "/data/cache/platform/" + cacheType + "/" + cachePvcName;
-            }
-        }
         try {
-            PipelineRunBuilder pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilderForShellWithCache(
-                    runtimeInfo, namespace, PIPELINE_RUN_GENERATE_NAME, REF_PIPELINE_NAME, cachePath);
+            PipelineRunBuilder pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilderForShell(
+                    runtimeInfo, namespace, PIPELINE_RUN_GENERATE_NAME, REF_PIPELINE_NAME);
             pipelineRunBuilder.editSpec()
                     .editLastTaskRunSpec()
                     .withServiceAccountName(serviceAccountForPostTask)

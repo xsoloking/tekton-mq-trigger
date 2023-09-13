@@ -1,0 +1,82 @@
+{
+  "project": "JJB_Task_Maven",
+  "token": "dev_token",
+  "parameter": [
+      {
+        "name": "flowId",
+        "value": 123456789
+      },
+      {
+        "name": "flowInstanceId",
+        "value": 123456789
+      },
+      {
+        "name": "nodeInstanceId",
+        "value": 123456789
+      },
+      {
+        "name": "taskInstanceId",
+        "value": 111222
+      },
+      {
+        "name": "taskPriority",
+        "value": 3
+      },
+      {
+        "name": "executeBatchId",
+        "value": 123456789
+      },
+      {
+        "name": "systemId",
+        "value": 123456789
+      },
+      {
+        "name": "tenantCode",
+        "value": 1
+      },
+      {
+        "name": "TASK_IMAGE",
+        "value": "maven:3.8.5-openjdk-17"
+      },
+      {
+        "name": "IMAGE_PULL_SECRETS",
+        "value": "regcred"
+      },
+      {
+        "name": "TSK_MEM_LIMIT",
+        "value": "1Gi"
+      },
+      {
+        "name": "TSK_CPU_LIMIT",
+        "value": "1000m"
+      },
+      {
+        "name": "TASK_TIMEOUT",
+        "value": 30
+      },
+      {
+        "name": "TASK_PVC_NAME",
+        "value": "test-03"
+      },
+      {
+        "name": "TASK_NODE_SELECTOR",
+        "value": "kubernetes.io/os: \"linux\""
+      },
+      {
+        "name": "TASK_CLOUD_NAME",
+        "value": "kubernetes"
+      },
+      {
+        "name": "TASK_CACHE_PVC_NAME",
+        "value": "maven-cache"
+      },
+      {
+        "name": "SOURCE",
+        "value": "spring-guides/gs-accessing-data-mongodb/main"
+      },
+      {
+        "name": "SCRIPT",
+        "value": "c2V0IC14OyBjZCBjb21wbGV0ZTsgIG12biBjbGVhbiBwYWNrYWdlIC1EbWF2ZW4udGVzdC5za2lwPXRydWUgLURtYXZlbi5yZXBvLmxvY2FsPS9yb290Ly5tMi8gCg=="
+      }
+    ]
+}

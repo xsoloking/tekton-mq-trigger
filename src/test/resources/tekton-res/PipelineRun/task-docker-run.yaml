@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: task-docker-run
+  namespace: default
+spec:
+  pipelineRef:
+    name: task-docker
+  status: ''
+  params:
+    - name: TASK_INSTANCE_ID
+      value: '1232133123'
+    - name: FLOW_INSTANCE_ID
+      value: '1232133123'
+    - name: WORKING_PATH
+      value: spring-guides/gs-spring-boot-docker/complete
+    - name: BUILD_EXTRA_ARGS
+      value: '-t harbor.byai.uk/test/abc:v0.1'
+  taskRunSpecs:
+    - pipelineTaskName: main
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+      serviceAccountName: docker-basic-auth
+    - pipelineTaskName: post
+      podTemplate:
+        nodeSelector:
+          kubernetes.io/os: linux
+      serviceAccountName: sa-with-secret-unix0cxutvqaerss2dkog
+  workspaces:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-03

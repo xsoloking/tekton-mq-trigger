@@ -1,0 +1,82 @@
+{
+  "project": "JJB_Task_Git",
+  "token": "dev_token",
+  "parameter": [
+      {
+        "name": "flowId",
+        "value": 123456789
+      },
+      {
+        "name": "flowInstanceId",
+        "value": 123456789
+      },
+      {
+        "name": "nodeInstanceId",
+        "value": 123456789
+      },
+      {
+        "name": "taskInstanceId",
+        "value": 123456789
+      },
+      {
+        "name": "taskPriority",
+        "value": 3
+      },
+      {
+        "name": "executeBatchId",
+        "value": 123456789
+      },
+      {
+        "name": "systemId",
+        "value": 123456789
+      },
+      {
+        "name": "tenantCode",
+        "value": 1
+      },
+      {
+        "name": "TASK_IMAGE",
+        "value": "alpine/git:latest"
+      },
+      {
+        "name": "IMAGE_PULL_SECRETS",
+        "value": "regcred"
+      },
+      {
+        "name": "TSK_MEM_LIMIT",
+        "value": "1Gi"
+      },
+      {
+        "name": "TSK_CPU_LIMIT",
+        "value": "1000m"
+      },
+      {
+        "name": "TASK_TIMEOUT",
+        "value": 30
+      },
+      {
+        "name": "TASK_PVC_NAME",
+        "value": "test-03"
+      },
+      {
+        "name": "TASK_NODE_SELECTOR",
+        "value": "kubernetes.io/os: \"linux\""
+      },
+      {
+        "name": "TASK_CLOUD_NAME",
+        "value": "kubernetes"
+      },
+      {
+        "name": "GIT_URL",
+        "value": "https://github.com/xsoloking/tekton-mq-trigger.git"
+      },
+      {
+        "name": "GIT_REVISION",
+        "value": "main"
+      },
+      {
+        "name": "CREDENTIALS_ID",
+        "value": "Z2l0aHViX3BhdF8xMUFBTkM0RkkwUlB4V0hhSndLVUNiX0cxUTVqaERSS2dKOG93U3c1encyQ0ZGSFhPSDlEVUtSSnl4WXA2QXpiaGFHVE9LUjVPSVpZa1BCOTR1"
+      }
+    ]
+}

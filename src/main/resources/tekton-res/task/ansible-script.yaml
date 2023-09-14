@@ -1,0 +1,48 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ansible-script
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.38.0"
+    devops.flow/categories: "other"
+    tekton.dev/platforms: "linux/amd64,linux/arm64"
+spec:
+  description: >-
+    These Tasks are used to execute bash script in the Pipeline.
+  workspaces:
+    - name: data
+      description: The data of pipeline/task in this Workspace.
+  params:
+    - name: working-path
+      description: dafault working path
+      default: "."
+    - name: taskImage
+      description: task image
+      default: "cytopia/ansible:2.13-tools"
+    - name: task-script
+      description: bash script encoded with base64
+      default: "cHdkO2xz"
+  steps:
+    - name: executor
+      image: "$(params.taskImage)"
+      workingDir: "$(workspaces.data.path)/$(params.working-path)"
+      env:
+      - name: WORKING_PATH
+        value: "$(workspaces.data.path)/$(params.working-path)"
+      - name: TASK_SCRIPT
+        value: "$(params.task-script)"
+#      securityContext:
+#        runAsNonRoot: true
+#        runAsUser: 65532
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/ansible/hosts
+          subPath: hosts
+          readOnly: true
+      script: |
+        #!/usr/bin/env sh
+        echo $TASK_SCRIPT | base64 -d > script.sh
+        ansible all -m ansible.builtin.script -a script.sh
+       

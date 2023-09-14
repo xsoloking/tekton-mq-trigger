@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: task-remote-shell
+spec:
+  workspaces:
+  - name: data
+  params:
+    - name: TASK_INSTANCE_ID
+      description: "taskInstanceId is used to update results"
+    - name: FLOW_INSTANCE_ID
+      description: "flowInstanceId is used to update results"
+    - name: WORKING_PATH
+      description: "default working path"
+      default: "."
+    - name: TASK_SCRIPT
+      description: "bash script encoded with base64"
+      default: "cHdkO2xz"
+    - name: TASK_IMAGE
+      description: "container image used by maven task"
+      default: "cytopia/ansible:2.13-tools"
+  tasks:
+    - name: main
+      taskRef:
+        name: ansible-script
+      params:
+        - name: working-path
+          value: $(params.WORKING_PATH)
+        - name: task-script
+          value: $(params.TASK_SCRIPT)
+        - name: taskImage
+          value: $(params.TASK_IMAGE)
+      workspaces:
+        - name: data
+          workspace: data
+  finally:
+    - name: post
+      taskRef:
+        name: post-handler
+      params:
+        - name: main-task-status
+          value: "$(tasks.main.status)"
+        - name: taskInstanceId
+          value: $(params.TASK_INSTANCE_ID)
+        - name: flowInstanceId
+          value: $(params.FLOW_INSTANCE_ID)
+        - name: working-path
+          value: $(params.WORKING_PATH)
+        - name: task-script
+          value: "common_post_handler.py"

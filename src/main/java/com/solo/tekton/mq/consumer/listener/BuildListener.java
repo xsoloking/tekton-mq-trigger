@@ -80,12 +80,12 @@ public class BuildListener {
         try {
             runtimeInfo = mapper.readValue(body, RuntimeInfo.class);
         } catch (IOException e) {
-            log.error("Task wasn't handled, due to failed to parse message: " + new String(body));
+            log.error("Task was failed due to failed to parse message: {}", new String(body));
             return;
         }
         // Should not happen
         if (runtimeInfo == null) {
-            log.error("Task wasn't handled, due to failed to parse message: " + new String(body));
+            log.error("Task was failed due to failed to parse message: {}", new String(body));
             return;
         }
         TaskLog taskLog = Common.generateTaskLog(runtimeInfo);

@@ -2,6 +2,7 @@ package com.solo.tekton.mq.consumer.utils;
 
 import io.fabric8.kubernetes.api.model.*;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,6 +33,19 @@ public class K8sResourceBuilder {
                     put("username", username);
                     put("password", password);
                 }}).build();
+    }
+
+    public static Secret createSecret(String secretName, String namespace, String dataKey, String dataValue) {
+        return new SecretBuilder()
+                .withApiVersion("v1")
+                .withKind("Secret")
+                .withNewMetadata()
+                .withName(secretName)
+                .withNamespace(namespace)
+                .endMetadata()
+                .withType("Opaque")
+                .withStringData(Collections.singletonMap(dataKey, dataValue))
+                .build();
     }
 
     /**

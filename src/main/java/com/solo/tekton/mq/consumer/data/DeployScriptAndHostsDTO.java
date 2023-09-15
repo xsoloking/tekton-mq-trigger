@@ -15,6 +15,7 @@ public class DeployScriptAndHostsDTO implements Serializable {
 
     @Data
     public static class Host {
+
         private Long hostId;
 
         private String hostDesc;

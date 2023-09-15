@@ -64,10 +64,9 @@ public class PipelineRunRemoteShellService implements PipelineRunService {
 
         StringBuilder secretName = new StringBuilder("host-");
         String dataValue = "[all]";
-        String newLine = System.getProperty("line.separator");
         for (DeployScriptAndHostsDTO.Host host: data.getHostList()) {
             secretName.append(String.join("-", host.getHostIp().split("\\.")));
-            dataValue = dataValue.concat(newLine);
+            dataValue = dataValue.concat(System.getProperty("line.separator"));
             dataValue = dataValue.concat(host.getHostIp()
                     + " ansible_ssh_port=" + host.getHostPort()
                     + " ansible_user=" + host.getHostAccount()

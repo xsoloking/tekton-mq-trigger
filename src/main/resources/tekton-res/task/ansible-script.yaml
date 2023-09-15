@@ -20,7 +20,7 @@ spec:
       default: "."
     - name: taskImage
       description: task image
-      default: "cytopia/ansible:2.13-tools"
+      default: "cytopia/ansible:2.13-infra"
     - name: task-script
       description: bash script encoded with base64
       default: "cHdkO2xz"

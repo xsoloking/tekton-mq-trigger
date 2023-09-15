@@ -18,7 +18,7 @@ spec:
       default: "cHdkO2xz"
     - name: TASK_IMAGE
       description: "container image used by maven task"
-      default: "cytopia/ansible:2.13-tools"
+      default: "cytopia/ansible:2.13-infra"
   tasks:
     - name: main
       taskRef:

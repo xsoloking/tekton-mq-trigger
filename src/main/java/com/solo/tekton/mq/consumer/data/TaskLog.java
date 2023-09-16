@@ -1,11 +1,13 @@
 package com.solo.tekton.mq.consumer.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 
 import java.io.Serializable;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TaskLog implements Serializable {
 
     @Id

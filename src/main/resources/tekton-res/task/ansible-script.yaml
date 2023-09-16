@@ -43,6 +43,6 @@ spec:
           readOnly: true
       script: |
         #!/usr/bin/env sh
+        export ANSIBLE_HOST_KEY_CHECKING=False
         echo $TASK_SCRIPT | base64 -d > script.sh
         ansible all -m ansible.builtin.script -a script.sh
-       

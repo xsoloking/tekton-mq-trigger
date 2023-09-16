@@ -66,7 +66,7 @@ public class BuildListener {
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "${flow.mq.queue.triggered}", durable = "true"),
             exchange = @Exchange(value = "${flow.mq.exchange}", type = ExchangeTypes.DIRECT),
-            key = "${flow.mq.routing.key.logging}"
+            key = "${flow.mq.routing.key.triggered}"
     ))
     public void receiveMessage(byte[] body) throws IOException {
         log.debug("BuildListener::Received message: " + new String(body));

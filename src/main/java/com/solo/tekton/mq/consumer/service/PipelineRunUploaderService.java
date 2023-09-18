@@ -91,7 +91,7 @@ public class PipelineRunUploaderService implements PipelineRunService {
     private String prepareShellScript(UploaderData data) {
         String script = "#!/usr/bin/env bash";
         script = script.concat(System.getProperty("line.separator"));
-        script = script.concat("set +x");
+        script = script.concat("set -x");
         script = script.concat(System.getProperty("line.separator"));
         if (data.getCompressName().endsWith("tar")) {
             script = script.concat("tar -cvf " + data.getCompressName() + " " + data.getDestFilePath());
@@ -101,7 +101,7 @@ public class PipelineRunUploaderService implements PipelineRunService {
         }
         script = script.concat(System.getProperty("line.separator"));
         // curl -v -u ${auth} --upload-file ${fileName} ${requestUrl}
-        script = script.concat("curl -v -u " + data.getUser() + ":" + data.getPassword() + " --upload-file " + data.getCompressName() + " " + data.getUploadDir());
+        script = script.concat("sex +x; curl -v -u " + data.getUser() + ":" + data.getPassword() + " --upload-file " + data.getCompressName() + " " + data.getUploadDir());
         script = script.concat(System.getProperty("line.separator"));
         // date '+%Y-%m-%d %H:%M:%S'
         script = script.concat("echo data=$(date '+%Y-%m-%d %H:%M:%S') > metadata.info");

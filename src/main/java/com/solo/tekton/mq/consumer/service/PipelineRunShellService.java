@@ -4,6 +4,7 @@ import com.solo.tekton.mq.consumer.data.RuntimeInfo;
 import com.solo.tekton.mq.consumer.utils.TektonResourceBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.tekton.client.TektonClient;
+import io.fabric8.tekton.pipeline.v1.ParamBuilder;
 import io.fabric8.tekton.pipeline.v1.PipelineRun;
 import io.fabric8.tekton.pipeline.v1.PipelineRunBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -45,9 +46,21 @@ public class PipelineRunShellService implements PipelineRunService {
     public PipelineRun createPipelineRun(RuntimeInfo runtimeInfo) {
         Map<String, String> params = runtimeInfo.getParams();
         try {
-            PipelineRunBuilder pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilderForShell(
+            PipelineRunBuilder pipelineRunBuilder = pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilder(
                     runtimeInfo, namespace, PIPELINE_RUN_GENERATE_NAME, REF_PIPELINE_NAME);
             pipelineRunBuilder.editSpec()
+//                    .addToParams(new ParamBuilder()
+//                            .withName("WORKING_PATH")
+//                            .withNewValue(params.get("SOURCE"))
+//                            .build())
+                    .addToParams(new ParamBuilder()
+                            .withName("TASK_IMAGE")
+                            .withNewValue(params.get("TASK_IMAGE"))
+                            .build())
+                    .addToParams(new ParamBuilder()
+                            .withName("TASK_SCRIPT")
+                            .withNewValue(params.get("SCRIPT"))
+                            .build())
                     .editLastTaskRunSpec()
                     .withServiceAccountName(serviceAccountForPostTask)
                     .endTaskRunSpec()

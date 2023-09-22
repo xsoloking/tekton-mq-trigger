@@ -18,7 +18,7 @@ spec:
       default: "cHdkO2xz"
     - name: TASK_IMAGE
       description: "container image used by maven task"
-      default: "soloking/tools:v1.0.1"
+      default: "registry.devops.yunbao/jenkins/bash:latest"
   tasks:
     - name: main
       taskRef:

@@ -56,7 +56,7 @@ public class PipelineRunRemoteShellService implements PipelineRunService {
         ObjectMapper mapper = new ObjectMapper();
         DeployScriptAndHostsDTO data = null;
         try {
-            data = mapper.readValue(Base64.getDecoder().decode(params.get("SCRIPT")), DeployScriptAndHostsDTO.class);
+            data = mapper.readValue(Base64.getDecoder().decode(params.get("PARAMS")), DeployScriptAndHostsDTO.class);
         } catch (IOException e) {
             log.error("Task was failed due to failed to parse message: {}", params.get("SCRIPT"));
             throw new RuntimeException("Task was failed due to failed to parse message: " + params.get("SCRIPT"));
@@ -81,14 +81,6 @@ public class PipelineRunRemoteShellService implements PipelineRunService {
             PipelineRunBuilder pipelineRunBuilder = TektonResourceBuilder.createPipelineRunBuilder(
                     runtimeInfo, namespace, PIPELINE_RUN_GENERATE_NAME, REF_PIPELINE_NAME);
             pipelineRunBuilder.editSpec()
-                    .addToParams(new ParamBuilder()
-                            .withName("WORKING_PATH")
-                            .withNewValue(params.get("SOURCE"))
-                            .build())
-                    .addToParams(new ParamBuilder()
-                            .withName("TASK_IMAGE")
-                            .withNewValue(params.get("TASK_IMAGE"))
-                            .build())
                     .addToParams(new ParamBuilder()
                             .withName("TASK_SCRIPT")
                             .withNewValue(new String(Base64.getEncoder().encode(data.getDeployScript().getBytes())))

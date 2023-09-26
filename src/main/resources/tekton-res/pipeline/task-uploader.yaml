@@ -47,4 +47,7 @@ spec:
         - name: working-path
           value: $(params.WORKING_PATH)
         - name: task-script
-          value: "uploader_post_handler.py"
+          value: "task_uploader_post_handler.py"
+      workspaces:
+        - name: data
+          workspace: data

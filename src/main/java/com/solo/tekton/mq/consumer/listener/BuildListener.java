@@ -15,11 +15,7 @@ import io.fabric8.kubernetes.client.WatcherException;
 import io.fabric8.tekton.client.TektonClient;
 import io.fabric8.tekton.pipeline.v1.PipelineRun;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.ExchangeTypes;
 import org.springframework.amqp.core.MessagePostProcessor;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -63,11 +59,7 @@ public class BuildListener {
     @Autowired
     LogService logService;
 
-    @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(value = "${flow.mq.queue.triggered}", durable = "true"),
-            exchange = @Exchange(value = "${flow.mq.exchange}", type = ExchangeTypes.DIRECT),
-            key = "${flow.mq.routing.key.triggered}"
-    ))
+    @RabbitListener(queues = "${flow.mq.queue.triggered}")
     public void receiveMessage(byte[] body) throws IOException {
         log.debug("BuildListener::Received message: " + new String(body));
         taskHandling(body);
